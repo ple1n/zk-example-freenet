@@ -1,0 +1,10 @@
+[package]
+name = "sp1-merkle-shared"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bincode.workspace = true
+serde.workspace = true
+sp1-primitives.workspace = true
+slop-algebra.workspace = true

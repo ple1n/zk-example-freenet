@@ -2,17 +2,16 @@ use std::{fs, path::PathBuf, time::Instant};
 
 use anyhow::{bail, Context};
 use clap::{Parser, Subcommand};
-use freenet_stdlib::{
-    client_api::{ClientRequest, ContractRequest, ContractResponse, HostResponse, WebApi},
-    prelude::{ContractCode, ContractKey, Parameters, StateDelta, UpdateData},
-};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use sp1_host_common::{
+    count_guest_cycles, load_or_setup_proving_key, monitor_async, read_proving_key, submit_update,
+    verify_compressed_proof,
+};
 use sp1_sdk::{
     include_elf, Elf, HashableKey, ProveRequest, Prover, ProverClient, ProvingKey, SP1Proof,
-    SP1ProvingKey, SP1Stdin,
+    SP1Stdin,
 };
-use sp1_verifier::compressed::SP1CompressedVerifierRaw;
 use zk_notepad_shared::{ContractParameters, NoteCandidate, ProofValues};
 
 const GUEST_ELF: Elf = include_elf!("sp1-notepad-guest");
@@ -27,41 +26,46 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Setup {
-        #[arg(long)]
+        #[arg(long, default_value = "secret.bin")]
         secret: PathBuf,
-        #[arg(long)]
+        #[arg(long, default_value = "sp1-contract-parameters.json")]
         output: PathBuf,
-        #[arg(long)]
+        #[arg(long, default_value = "sp1-proving-key.bin")]
         proving_key: PathBuf,
     },
     Prove {
-        #[arg(long)]
+        #[arg(long, default_value = "secret.bin")]
         secret: PathBuf,
-        #[arg(long)]
+        #[arg(long, default_value = "sp1-contract-parameters.json")]
         parameters: PathBuf,
-        #[arg(long)]
+        #[arg(long, default_value = "sp1-proving-key.bin")]
         proving_key: PathBuf,
         #[arg(long)]
         counter: u64,
         #[arg(long)]
         text: String,
-        #[arg(long)]
+        #[arg(long, default_value = "sp1-candidate.json")]
         output: PathBuf,
+        #[arg(long, help = "Run the guest once to report its SP1 cycle count")]
+        count_cycles: bool,
     },
     Verify {
-        #[arg(long)]
+        #[arg(long, default_value = "sp1-contract-parameters.json")]
         parameters: PathBuf,
-        #[arg(long)]
+        #[arg(long, default_value = "sp1-candidate.json")]
         candidate: PathBuf,
     },
     Submit {
         #[arg(long)]
         endpoint: String,
-        #[arg(long)]
+        #[arg(
+            long,
+            default_value = "sp1/target/wasm32-unknown-unknown/release/sp1_container.wasm"
+        )]
         contract_code: PathBuf,
-        #[arg(long)]
+        #[arg(long, default_value = "sp1-contract-parameters.json")]
         parameters: PathBuf,
-        #[arg(long)]
+        #[arg(long, default_value = "sp1-candidate.json")]
         candidate: PathBuf,
     },
 }
@@ -103,12 +107,7 @@ fn verify_proof(
     verifying_key_hash: &[u8],
 ) -> anyhow::Result<()> {
     let started = Instant::now();
-    let result = SP1CompressedVerifierRaw::verify_with_public_values(
-        proof,
-        public_values,
-        verifying_key_hash,
-    )
-    .context("verifying SP1 compressed proof with the WASM verifier");
+    let result = verify_compressed_proof(proof, public_values, verifying_key_hash);
     println!(
         "Proof verification took {:.3}s",
         started.elapsed().as_secs_f64()
@@ -125,20 +124,6 @@ fn verify_proof(
     }
 }
 
-fn read_proving_key(path: &PathBuf) -> anyhow::Result<SP1ProvingKey> {
-    let bytes =
-        fs::read(path).with_context(|| format!("reading proving key {}", path.display()))?;
-    let proving_key: SP1ProvingKey = bincode::deserialize(&bytes)
-        .with_context(|| format!("deserializing proving key {}", path.display()))?;
-    if &**proving_key.elf() != &*GUEST_ELF {
-        bail!(
-            "proving key {} was generated for a different guest ELF; remove it and rerun setup",
-            path.display()
-        );
-    }
-    Ok(proving_key)
-}
-
 async fn setup(
     secret_path: PathBuf,
     output: PathBuf,
@@ -147,30 +132,17 @@ async fn setup(
     let command_started = Instant::now();
     let secret = read_secret(&secret_path)?;
     let public_y = sha256(&secret);
-    let cache_hit = proving_key_path.exists();
-    let key_started = Instant::now();
-    let proving_key = if cache_hit {
-        read_proving_key(&proving_key_path)?
-    } else {
-        let client = ProverClient::builder().cpu().build().await;
-        let proving_key = client
-            .setup(GUEST_ELF.clone())
-            .await
-            .context("setting up SP1 proving key")?;
-        let bytes = bincode::serialize(&proving_key).context("serializing SP1 proving key")?;
-        fs::write(&proving_key_path, bytes)
-            .with_context(|| format!("writing proving key {}", proving_key_path.display()))?;
-        proving_key
-    };
+    let (proving_key, cache_hit, key_duration) =
+        load_or_setup_proving_key(&GUEST_ELF, &proving_key_path).await?;
     if cache_hit {
         println!(
             "Proving-key cache load took {:.3}s",
-            key_started.elapsed().as_secs_f64()
+            key_duration.as_secs_f64()
         );
     } else {
         println!(
             "Proving-key setup and cache write took {:.3}s",
-            key_started.elapsed().as_secs_f64()
+            key_duration.as_secs_f64()
         );
     }
     let verifying_key_hash = bincode::serialize(&proving_key.verifying_key().hash_koalabear())?;
@@ -199,6 +171,7 @@ async fn prove(
     counter: u64,
     text: String,
     output: PathBuf,
+    count_cycles: bool,
 ) -> anyhow::Result<()> {
     let command_started = Instant::now();
     let secret = read_secret(&secret_path)?;
@@ -219,7 +192,7 @@ async fn prove(
     stdin.write(&text_hash);
 
     let key_started = Instant::now();
-    let proving_key = read_proving_key(&proving_key_path)?;
+    let proving_key = read_proving_key(&proving_key_path, &GUEST_ELF)?;
     println!(
         "Proving-key load took {:.3}s",
         key_started.elapsed().as_secs_f64()
@@ -231,19 +204,25 @@ async fn prove(
             proving_key_path.display()
         );
     }
-
     let client = ProverClient::builder().cpu().build().await;
+    if count_cycles {
+        let cycles = count_guest_cycles(&GUEST_ELF, &stdin).await?;
+        println!("SP1 guest cycle count: {cycles}");
+    }
     let prove_started = Instant::now();
-    let proof_result = client
-        .prove(&proving_key, stdin)
-        .compressed()
-        .await
-        .context("generating SP1 compressed proof");
+    let proof = monitor_async("SP1 compressed proof generation", async {
+        client
+            .prove(&proving_key, stdin)
+            .compressed()
+            .await
+            .context("generating SP1 compressed proof")
+    })
+    .await;
     println!(
         "Proof generation took {:.3}s",
         prove_started.elapsed().as_secs_f64()
     );
-    let proof = proof_result?;
+    let proof = proof?;
     if !matches!(&proof.proof, SP1Proof::Compressed(_)) {
         bail!("SP1 prover returned a proof that is not compressed");
     }
@@ -309,46 +288,16 @@ async fn submit(
     parameters_path: PathBuf,
     candidate_path: PathBuf,
 ) -> anyhow::Result<()> {
-    let contract_code = ContractCode::load_raw(&contract_code_path)
-        .with_context(|| format!("reading contract wasm {}", contract_code_path.display()))?;
-    let parameters = Parameters::from(
-        fs::read(&parameters_path)
-            .with_context(|| format!("reading {}", parameters_path.display()))?,
-    );
-    let key = ContractKey::from_params_and_code(&parameters, &contract_code);
     let delta = fs::read(&candidate_path)
         .with_context(|| format!("reading candidate {}", candidate_path.display()))?;
     let _: NoteCandidate = serde_json::from_slice(&delta).context("parsing candidate JSON")?;
-
-    let (socket, _) = tokio_tungstenite::connect_async(&endpoint)
-        .await
-        .with_context(|| format!("connecting to Freenet node at {endpoint}"))?;
-    let mut client = WebApi::start(socket);
-    client
-        .send(ClientRequest::ContractOp(ContractRequest::Update {
-            key,
-            data: UpdateData::Delta(StateDelta::from(delta)),
-        }))
-        .await
-        .context("sending contract update")?;
-
-    let response = tokio::time::timeout(std::time::Duration::from_secs(120), async {
-        loop {
-            match client.recv().await? {
-                HostResponse::ContractResponse(ContractResponse::UpdateResponse {
-                    key: response_key,
-                    ..
-                }) if response_key == key => return Ok::<(), anyhow::Error>(()),
-                HostResponse::ContractResponse(ContractResponse::UpdateNotification { .. }) => {}
-                other => bail!("unexpected response while awaiting update: {other}"),
-            }
-        }
-    })
+    submit_update(
+        &endpoint,
+        &contract_code_path,
+        &parameters_path,
+        &candidate_path,
+    )
     .await
-    .context("timed out waiting for Freenet update response")?;
-    response.context("Freenet node rejected the update request")?;
-    println!("Freenet accepted the update request for contract {key}");
-    Ok(())
 }
 
 #[tokio::main]
@@ -366,7 +315,19 @@ async fn main() -> anyhow::Result<()> {
             counter,
             text,
             output,
-        } => prove(secret, parameters, proving_key, counter, text, output).await,
+            count_cycles,
+        } => {
+            prove(
+                secret,
+                parameters,
+                proving_key,
+                counter,
+                text,
+                output,
+                count_cycles,
+            )
+            .await
+        }
         Command::Verify {
             parameters,
             candidate,

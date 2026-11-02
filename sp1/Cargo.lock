@@ -4428,6 +4428,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sp1-host-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "freenet-stdlib",
+ "sp1-prover",
+ "sp1-sdk",
+ "sp1-verifier",
+ "sysinfo",
+ "tokio",
+ "tokio-tungstenite",
+]
+
+[[package]]
 name = "sp1-hypercube"
 version = "6.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4504,6 +4519,56 @@ dependencies = [
 ]
 
 [[package]]
+name = "sp1-merkle-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "clap",
+ "freenet-stdlib",
+ "hex",
+ "serde",
+ "serde_json",
+ "sp1-build",
+ "sp1-host-common",
+ "sp1-merkle-shared",
+ "sp1-sdk",
+ "tokio",
+]
+
+[[package]]
+name = "sp1-merkle-container"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "freenet-stdlib",
+ "getrandom 0.2.17",
+ "hex",
+ "serde",
+ "serde_json",
+ "sp1-merkle-shared",
+ "sp1-verifier",
+]
+
+[[package]]
+name = "sp1-merkle-guest"
+version = "0.1.0"
+dependencies = [
+ "sp1-merkle-shared",
+ "sp1-zkvm",
+]
+
+[[package]]
+name = "sp1-merkle-shared"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "serde",
+ "slop-algebra",
+ "sp1-primitives",
+]
+
+[[package]]
 name = "sp1-notepad-client"
 version = "0.1.0"
 dependencies = [
@@ -4516,10 +4581,10 @@ dependencies = [
  "serde_json",
  "sha2",
  "sp1-build",
+ "sp1-host-common",
  "sp1-sdk",
  "sp1-verifier",
  "tokio",
- "tokio-tungstenite",
  "zk-notepad-shared",
 ]
 

@@ -144,9 +144,10 @@ covering its padding, byte packing, and output encoding.
 An independent SP1 prover and Freenet contract live in [sp1/](./sp1/). This
 is a separate Cargo workspace with its own lockfile and target directory, so
 SP1 builds and WASM size measurements do not include the Ziren dependencies.
-See [sp1/README.md](./sp1/README.md) for proof generation, offline verification,
-and isolated contract build commands. The SP1 implementation uses SHA-256 for
-the secret and text hashes and verifies SP1 compressed proofs.
+The workspace shares host setup, proving-key loading, compressed-proof
+verification, and Freenet submission between its notepad and Poseidon2 Merkle
+membership experiments. See [sp1/README.md](./sp1/README.md) for proof
+generation, offline verification, and separate contract-size measurements.
 
 ## Test run for Ziren on my machine 
 
@@ -288,3 +289,94 @@ Candidate proof is valid.
 Verify command took 0.058s
 ```
 
+The notepad defaults to `secret.bin`, `sp1-contract-parameters.json`,
+`sp1-proving-key.bin`, and `sp1-candidate.json`.
+
+This merkle example is useful for anonymous membership proofs. In practice we prefer Sparse Merkle Tree instead of this simple one.
+
+The same SP1 test workflow also exercises the Poseidon2 Merkle membership
+program. Generate its independent tree secret once, then run setup, prove, and
+verify:
+
+```sh
+head -c 32 /dev/urandom > sp1-merkle-tree-secret.bin
+
+cargo run -r --manifest-path sp1/Cargo.toml -p sp1-merkle-client -- setup
+cargo run -r --manifest-path sp1/Cargo.toml -p sp1-merkle-client -- prove \
+  --leaf-index 42 --count-cycles
+cargo run -r --manifest-path sp1/Cargo.toml -p sp1-merkle-client -- verify
+```
+
+By default, the Merkle client writes
+`sp1-merkle-contract-parameters.json`, `sp1-merkle-proving-key.bin`, and
+`sp1-merkle-candidate.json`; its tree secret defaults to
+`sp1-merkle-tree-secret.bin`. These paths are separate from the notepad's and
+can be overridden with their corresponding options.
+
+```sh
+/e/p/zk-example-freenet (master)> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-merkle-client -- setup
+   Compiling sp1-merkle-client v0.1.0 (/e/proj/zk-example-freenet/sp1/merkle-client)
+   Compiling sp1-host-common v0.1.0 (/e/proj/zk-example-freenet/sp1/host-common)
+warning: sp1-merkle-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-merkle-client@0.1.0: sp1-merkle-guest built at 2026-11-03 04:30:08
+    Finished `release` profile [optimized] target(s) in 1m 06s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-merkle-client setup`
+[Poseidon2 tree construction] elapsed 0.0s | CPU 0.0% | memory 7.9 MiB | peak 7.9 MiB
+[Poseidon2 tree construction] finished in 0.5s | peak memory 7.9 MiB
+Poseidon2 tree construction took 0.485s
+[SP1 proving-key setup] elapsed 35.1s | CPU 735.4% | memory 7048.3 MiB | peak 7048.3 MiBB
+[SP1 proving-key setup] finished in 36.0s | peak memory 7048.3 MiB
+Proving-key setup and cache write took 35.992s
+Wrote public contract parameters to sp1-merkle-contract-parameters.json
+Wrote reusable proving key to sp1-merkle-proving-key.bin
+Public Merkle root: [1132742922, 2083440627, 2042222920, 932570131, 1604652421, 1170845756, 1223358478, 736266596]
+Setup command took 36.477s
+
+/e/p/zk-example-freenet (master)> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-merkle-client -- prove \
+                                        --leaf-index 42
+warning: sp1-merkle-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-merkle-client@0.1.0: sp1-merkle-guest built at 2026-11-03 04:30:08
+   Compiling sp1-merkle-client v0.1.0 (/e/proj/zk-example-freenet/sp1/merkle-client)
+    Finished `release` profile [optimized] target(s) in 40.82s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-merkle-client prove --leaf-index 42`
+Proving-key load took 0.001s
+[SP1 compressed proof generation] elapsed 123.1s | CPU 807.3% | memory 10579.5 MiB | peak 18412.0 MiBB
+[SP1 compressed proof generation] finished in 123.9s | peak memory 18412.0 MiB
+Proof generation took 123.874s
+[SP1 compressed proof verification] elapsed 0.0s | CPU 0.0% | memory 9123.7 MiB | peak 9123.7 MiB
+[SP1 compressed proof verification] finished in 0.0s | peak memory 9123.7 MiB
+Proof verification took 0.045s
+Serialized proof size: 1272546 bytes
+Wrote verified candidate to sp1-merkle-candidate.json
+Prove command took 155.488s
+
+/e/p/zk-example-freenet (master)> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-merkle-client -- verify
+warning: sp1-merkle-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-merkle-client@0.1.0: sp1-merkle-guest built at 2026-11-03 04:30:08
+    Finished `release` profile [optimized] target(s) in 0.34s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-merkle-client verify`
+[SP1 compressed proof verification] elapsed 0.0s | CPU 0.0% | memory 12.3 MiB | peak 12.3 MiB
+[SP1 compressed proof verification] finished in 0.1s | peak memory 12.3 MiB
+Proof verification took 0.057s
+Candidate proof is valid.
+Verify command took 0.076s
+
+/e/p/zk-example-freenet (master)> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-merkle-client -- prove \
+                                        --leaf-index 42 --count-cycles
+warning: sp1-merkle-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-merkle-client@0.1.0: sp1-merkle-guest built at 2026-11-03 04:30:08
+    Finished `release` profile [optimized] target(s) in 0.23s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-merkle-client prove --leaf-index 42 --count-cycles`
+Proving-key load took 0.001s
+[SP1 guest cycle count] elapsed 0.0s | CPU 0.0% | memory 6590.5 MiB | peak 6590.5 MiB
+[SP1 guest cycle count] finished in 0.0s | peak memory 6590.5 MiB
+SP1 guest cycle count: 1912850
+```

@@ -16,7 +16,7 @@ sha2.workspace = true
 sp1-sdk.workspace = true
 sp1-verifier.workspace = true
 tokio.workspace = true
-tokio-tungstenite = "0.27"
+sp1-host-common.workspace = true
 zk-notepad-shared.workspace = true
 
 [build-dependencies]

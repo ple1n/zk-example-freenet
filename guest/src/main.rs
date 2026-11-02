@@ -4,7 +4,7 @@
 extern crate alloc;
 
 use zk_notepad_shared::ProofValues;
-use zkm_zkvm::lib::poseidon2::poseidon2;    
+use zkm_zkvm::lib::poseidon2::poseidon2;
 
 zkm_zkvm::entrypoint!(main);
 

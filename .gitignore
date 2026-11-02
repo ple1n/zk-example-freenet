@@ -6,9 +6,8 @@
 /sp1/target/
 /secret.bin
 /contract-parameters.json
-/sp1-contract-parameters.json
-/candidate.json
-/sp1-candidate.json
-/sp1-proving-key.bin
 .freenet-local/
 build/
+*candidate*
+*.bin
+*.json

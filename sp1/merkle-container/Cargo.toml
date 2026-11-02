@@ -1,0 +1,17 @@
+[package]
+name = "sp1-merkle-container"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bincode.workspace = true
+freenet-stdlib = { workspace = true, features = ["contract"] }
+getrandom = { version = "0.2", features = ["js"] }
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sp1-verifier.workspace = true
+sp1-merkle-shared.workspace = true
+
+[lib]
+crate-type = ["cdylib"]

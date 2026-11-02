@@ -1,0 +1,10 @@
+/node_modules/
+/target/
+/container/target/
+/client/target/
+/guest/target/
+/secret.bin
+/contract-parameters.json
+/candidate.json
+.freenet-local/
+build/

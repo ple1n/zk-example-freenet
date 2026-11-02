@@ -22,8 +22,9 @@ cargo run --manifest-path sp1/Cargo.toml -p sp1-notepad-client -- prove \
 cargo run --manifest-path sp1/Cargo.toml -p sp1-notepad-client -- verify
 ```
 
-The notepad uses SHA-256 for its secret and text hashes. Its proving key and
-parameters are tied to the notepad guest ELF. By default, the client reads
+The notepad uses SP1's `Poseidon2ByteHash` syscall for its secret and text hashes.
+Host-side clients and the contract use the matching SP1 Poseidon2 sponge encoding.
+Its proving key and parameters are tied to the notepad guest ELF. By default, the client reads
 `secret.bin` and writes `sp1-contract-parameters.json`, `sp1-proving-key.bin`,
 and `sp1-candidate.json`. Pass `--count-cycles` to `prove` to run the guest
 once before proving and report its SP1 cycle count; this optional diagnostic
@@ -33,8 +34,9 @@ adds a second guest execution.
 
 The Merkle experiment creates a complete tree of `2^depth` leaves. Leaf values
 are derived from a private 32-byte tree secret and their indices; the leaf and
-internal-node commitments use SP1's Poseidon2 hash. The guest proves that a
-private leaf and authentication path reconstruct the public root. The
+internal-node commitments use `Poseidon2ByteHash`. Each Merkle input is serialized
+as canonical little-endian 32-bit field values before byte hashing. The guest proves
+that a private leaf and authentication path reconstruct the public root. The
 candidate contains only the compressed proof; the contract's public parameters
 bind both the root and tree depth, so the leaf, index, and sibling path are not
 published.

@@ -8,3 +8,6 @@ bincode.workspace = true
 serde.workspace = true
 sp1-primitives.workspace = true
 slop-algebra.workspace = true
+
+[target.'cfg(target_os = "zkvm")'.dependencies]
+sp1-zkvm.workspace = true

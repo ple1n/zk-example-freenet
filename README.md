@@ -234,6 +234,8 @@ But given how slow Ziren is I'm giving SP1 a try.
 
 Install `protobuf-devel`
 
+This run used sha256
+
 ```sh
 /e/p/zk-example-freenet (master) [101]> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-notepad-client -- setup \
                                               --secret secret.bin \
@@ -379,4 +381,128 @@ Proving-key load took 0.001s
 [SP1 guest cycle count] elapsed 0.0s | CPU 0.0% | memory 6590.5 MiB | peak 6590.5 MiB
 [SP1 guest cycle count] finished in 0.0s | peak memory 6590.5 MiB
 SP1 guest cycle count: 1912850
+```
+
+## Test run with SP1, corrected.
+
+Previous code was using SHA256 in notepad and non-accelerated Poseidon in merkle client. 
+
+This run have all AI misalignment corrected.
+
+```sh
+/e/p/zk-example-freenet (master)> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-notepad-client -- setup
+warning: sp1-notepad-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-notepad-client@0.1.0: sp1-notepad-guest built at 2026-11-03 05:15:39
+    Finished `release` profile [optimized] target(s) in 0.25s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-notepad-client setup`
+[SP1 proving-key setup] elapsed 35.0s | CPU 951.4% | memory 7133.3 MiB | peak 7133.3 MiBB
+[SP1 proving-key setup] finished in 35.2s | peak memory 7133.3 MiB
+Proving-key setup and cache write took 35.225s
+Wrote public contract parameters to sp1-contract-parameters.json
+Wrote reusable proving key to sp1-proving-key.bin
+Public y: de92bd78e36ec44fe5ee471494c0195d3532f45a7bd8a65dda6ece483cb21d4d
+Setup command took 35.226s
+
+/e/p/zk-example-freenet (master)> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-notepad-client -- prove --count-cycles --counter 10 --text "Testing" 
+warning: sp1-notepad-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-notepad-client@0.1.0: sp1-notepad-guest built at 2026-11-03 05:15:39
+    Finished `release` profile [optimized] target(s) in 0.22s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-notepad-client prove --count-cycles --counter 10 --text Testing`
+Proving-key load took 0.001s
+[SP1 guest cycle count] elapsed 0.0s | CPU 0.0% | memory 6603.8 MiB | peak 6603.8 MiB
+[SP1 guest cycle count] finished in 0.0s | peak memory 6603.8 MiB
+SP1 guest cycle count: 21577
+[SP1 compressed proof generation] elapsed 101.1s | CPU 853.7% | memory 8855.8 MiB | peak 16194.5 MiBB
+[SP1 compressed proof generation] finished in 102.0s | peak memory 16194.5 MiB
+Proof generation took 102.020s
+[SP1 compressed proof verification] elapsed 0.0s | CPU 0.0% | memory 7329.6 MiB | peak 7329.6 MiB
+[SP1 compressed proof verification] finished in 0.0s | peak memory 7329.6 MiB
+Proof verification took 0.045s
+WASM verifier accepts this proof: yes
+Wrote verified update candidate to sp1-candidate.json
+Prove command took 133.708s
+
+/e/p/zk-example-freenet (master)> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-notepad-client -- verify
+warning: sp1-notepad-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-notepad-client@0.1.0: sp1-notepad-guest built at 2026-11-03 05:15:39
+    Finished `release` profile [optimized] target(s) in 0.24s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-notepad-client verify`
+[SP1 compressed proof verification] elapsed 0.0s | CPU 0.0% | memory 12.2 MiB | peak 12.2 MiB
+[SP1 compressed proof verification] finished in 0.0s | peak memory 12.2 MiB
+Proof verification took 0.044s
+WASM verifier accepts this proof: yes
+Candidate proof is valid.
+Verify command took 0.056s
+```
+
+```sh
+/e/p/z/sp1 (master)> cd merkle-guest/
+/e/p/z/s/merkle-guest (master)> cargo prove build
+[sp1]      Finished `release` profile [optimized] target(s) in 0.09s
+cargo:rustc-env=SP1_ELF_sp1-merkle-guest=/s2a/cargo-target/elf-compilation/riscv64im-succinct-zkvm-elf/release/sp1-merkle-guest
+
+/e/p/zk-example-freenet (master) [2]> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-merkle-client -- clear
+/e/p/zk-example-freenet (master)> head -c 32 /dev/urandom > sp1-merkle-tree-secret.bin
+
+/e/p/zk-example-freenet (master)> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-merkle-client -- setup
+warning: sp1-merkle-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-merkle-client@0.1.0: sp1-merkle-guest built at 2026-11-03 05:21:39
+    Finished `release` profile [optimized] target(s) in 0.25s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-merkle-client setup`
+Expected Poseidon2 hashes: 196607 (full-tree construction)
+[Poseidon2 tree construction] elapsed 0.0s | CPU 0.0% | memory 7.0 MiB | peak 7.0 MiB
+[Poseidon2 tree construction] finished in 0.7s | peak memory 7.0 MiB
+Poseidon2 tree construction took 0.726s
+[SP1 proving-key setup] elapsed 34.0s | CPU 894.8% | memory 7157.6 MiB | peak 7157.6 MiBB
+[SP1 proving-key setup] finished in 34.4s | peak memory 7157.6 MiB
+Proving-key setup and cache write took 34.375s
+Wrote public contract parameters to sp1-merkle-contract-parameters.json
+Wrote reusable proving key to sp1-merkle-proving-key.bin
+Public Merkle root: [55345880, 1636996592, 410100043, 1704962001, 1025493057, 772939018, 1787655375, 393311365]
+Setup command took 35.100s
+
+/e/p/zk-example-freenet (master)> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-merkle-client -- prove \
+                                        --leaf-index 42 --count-cycles
+warning: sp1-merkle-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-merkle-client@0.1.0: sp1-merkle-guest built at 2026-11-03 05:21:39
+    Finished `release` profile [optimized] target(s) in 0.22s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-merkle-client prove --leaf-index 42 --count-cycles`
+Expected Poseidon2 hashes: 196607 (membership witness construction)
+Expected Poseidon2 hashes: 17 (guest membership path: one leaf hash + 16 sibling hashes)
+Proving-key load took 0.000s
+[SP1 guest cycle count] elapsed 0.0s | CPU 0.0% | memory 6592.1 MiB | peak 6592.1 MiB
+[SP1 guest cycle count] finished in 0.0s | peak memory 6592.1 MiB
+SP1 guest cycle count: 64774
+[SP1 compressed proof generation] elapsed 96.1s | CPU 950.0% | memory 9463.7 MiB | peak 17103.9 MiBBB
+[SP1 compressed proof generation] finished in 96.6s | peak memory 17103.9 MiB
+Proof generation took 96.600s
+[SP1 compressed proof verification] elapsed 0.0s | CPU 0.0% | memory 8103.9 MiB | peak 8103.9 MiB
+[SP1 compressed proof verification] finished in 0.0s | peak memory 8103.9 MiB
+Proof verification took 0.045s
+Serialized proof size: 1272546 bytes
+Wrote verified candidate to sp1-merkle-candidate.json
+Prove command took 129.442s
+
+/e/p/zk-example-freenet (master)> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-merkle-client -- verify
+warning: sp1-merkle-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-merkle-client@0.1.0: sp1-merkle-guest built at 2026-11-03 05:21:39
+    Finished `release` profile [optimized] target(s) in 0.26s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-merkle-client verify`
+[SP1 compressed proof verification] elapsed 0.0s | CPU 0.0% | memory 11.8 MiB | peak 11.8 MiB
+[SP1 compressed proof verification] finished in 0.0s | peak memory 11.8 MiB
+Proof verification took 0.044s
+Candidate proof is valid.
+Verify command took 0.057s
 ```

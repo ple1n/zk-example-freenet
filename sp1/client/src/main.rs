@@ -3,11 +3,11 @@ use std::{fs, path::PathBuf, time::Instant};
 use anyhow::{bail, Context};
 use clap::{Parser, Subcommand};
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 use sp1_host_common::{
     count_guest_cycles, load_or_setup_proving_key, monitor_async, read_proving_key, submit_update,
     verify_compressed_proof,
 };
+use sp1_merkle_shared::poseidon2_bytes;
 use sp1_sdk::{
     include_elf, Elf, HashableKey, ProveRequest, Prover, ProverClient, ProvingKey, SP1Proof,
     SP1Stdin,
@@ -55,6 +55,16 @@ enum Command {
         #[arg(long, default_value = "sp1-candidate.json")]
         candidate: PathBuf,
     },
+    Clear {
+        #[arg(long, default_value = "secret.bin")]
+        secret: PathBuf,
+        #[arg(long, default_value = "sp1-contract-parameters.json")]
+        parameters: PathBuf,
+        #[arg(long, default_value = "sp1-proving-key.bin")]
+        proving_key: PathBuf,
+        #[arg(long, default_value = "sp1-candidate.json")]
+        candidate: PathBuf,
+    },
     Submit {
         #[arg(long)]
         endpoint: String,
@@ -82,8 +92,17 @@ fn write_json(path: &PathBuf, value: &impl Serialize) -> anyhow::Result<()> {
     fs::write(path, bytes).with_context(|| format!("writing {}", path.display()))
 }
 
-fn sha256(bytes: &[u8]) -> [u8; 32] {
-    Sha256::digest(bytes).into()
+fn clear(paths: [PathBuf; 4]) -> anyhow::Result<()> {
+    for path in paths {
+        match fs::remove_file(&path) {
+            Ok(()) => println!("Removed {}", path.display()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(error).with_context(|| format!("removing {}", path.display()));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn decode_public_y(public_y: &str) -> anyhow::Result<[u8; 32]> {
@@ -131,7 +150,7 @@ async fn setup(
 ) -> anyhow::Result<()> {
     let command_started = Instant::now();
     let secret = read_secret(&secret_path)?;
-    let public_y = sha256(&secret);
+    let public_y = poseidon2_bytes(&secret);
     let (proving_key, cache_hit, key_duration) =
         load_or_setup_proving_key(&GUEST_ELF, &proving_key_path).await?;
     if cache_hit {
@@ -181,10 +200,10 @@ async fn prove(
     )
     .with_context(|| format!("parsing {}", parameters_path.display()))?;
     let public_y = decode_public_y(&parameters.public_y)?;
-    if sha256(&secret) != public_y {
+    if poseidon2_bytes(&secret) != public_y {
         bail!("secret does not match the public_y in the contract parameters");
     }
-    let text_hash = sha256(text.as_bytes());
+    let text_hash = poseidon2_bytes(text.as_bytes());
     let mut stdin = SP1Stdin::new();
     stdin.write(&secret);
     stdin.write(&public_y);
@@ -270,7 +289,7 @@ fn verify(parameters_path: PathBuf, candidate_path: PathBuf) -> anyhow::Result<(
     let public_values = bincode::serialize(&ProofValues {
         public_y,
         counter: candidate.counter,
-        text_hash: sha256(candidate.text.as_bytes()),
+        text_hash: poseidon2_bytes(candidate.text.as_bytes()),
     })?;
     verify_proof(&proof, &public_values, &verifying_key_hash)
         .context("candidate proof is invalid")?;
@@ -332,6 +351,12 @@ async fn main() -> anyhow::Result<()> {
             parameters,
             candidate,
         } => verify(parameters, candidate),
+        Command::Clear {
+            secret,
+            parameters,
+            proving_key,
+            candidate,
+        } => clear([secret, parameters, proving_key, candidate]),
         Command::Submit {
             endpoint,
             contract_code,

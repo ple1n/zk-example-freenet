@@ -57,6 +57,16 @@ enum Command {
         #[arg(long, default_value = "sp1-merkle-candidate.json")]
         candidate: PathBuf,
     },
+    Clear {
+        #[arg(long, default_value = "sp1-merkle-tree-secret.bin")]
+        tree_secret: PathBuf,
+        #[arg(long, default_value = "sp1-merkle-contract-parameters.json")]
+        parameters: PathBuf,
+        #[arg(long, default_value = "sp1-merkle-proving-key.bin")]
+        proving_key: PathBuf,
+        #[arg(long, default_value = "sp1-merkle-candidate.json")]
+        candidate: PathBuf,
+    },
     Submit {
         #[arg(long)]
         endpoint: String,
@@ -85,6 +95,24 @@ fn write_json(path: &PathBuf, value: &impl Serialize) -> anyhow::Result<()> {
     fs::write(path, bytes).with_context(|| format!("writing {}", path.display()))
 }
 
+fn clear(paths: [PathBuf; 4]) -> anyhow::Result<()> {
+    for path in paths {
+        match fs::remove_file(&path) {
+            Ok(()) => println!("Removed {}", path.display()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(error).with_context(|| format!("removing {}", path.display()));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn expected_tree_hash_count(tree_depth: u32) -> u64 {
+    let leaf_count = 1u64 << tree_depth;
+    3 * leaf_count - 1
+}
+
 fn read_parameters(path: &PathBuf) -> anyhow::Result<MerkleContractParameters> {
     serde_json::from_slice(&fs::read(path).with_context(|| format!("reading {}", path.display()))?)
         .with_context(|| format!("parsing {}", path.display()))
@@ -107,6 +135,13 @@ async fn setup(
 ) -> anyhow::Result<()> {
     let command_started = Instant::now();
     let tree_secret = read_tree_secret(&tree_secret_path)?;
+    if tree_depth == 0 || tree_depth > MAX_TREE_DEPTH {
+        bail!("depth must be in 1..={MAX_TREE_DEPTH}");
+    }
+    println!(
+        "Expected Poseidon2 hashes: {} (full-tree construction)",
+        expected_tree_hash_count(tree_depth)
+    );
     let tree_started = Instant::now();
     let levels = monitor_sync("Poseidon2 tree construction", || {
         build_tree(&tree_secret, tree_depth)
@@ -165,6 +200,15 @@ async fn prove(
     if leaf_index >= (1u32 << parameters.tree_depth) {
         bail!("leaf_index is outside the configured tree");
     }
+    println!(
+        "Expected Poseidon2 hashes: {} (membership witness construction)",
+        expected_tree_hash_count(parameters.tree_depth)
+    );
+    println!(
+        "Expected Poseidon2 hashes: {} (guest membership path: one leaf hash + {} sibling hashes)",
+        u64::from(parameters.tree_depth) + 1,
+        parameters.tree_depth
+    );
     let (leaf, siblings, root) =
         membership_witness(&tree_secret, parameters.tree_depth, leaf_index)
             .ok_or_else(|| anyhow::anyhow!("cannot construct membership witness"))?;
@@ -313,6 +357,12 @@ async fn main() -> anyhow::Result<()> {
             parameters,
             candidate,
         } => verify(parameters, candidate),
+        Command::Clear {
+            tree_secret,
+            parameters,
+            proving_key,
+            candidate,
+        } => clear([tree_secret, parameters, proving_key, candidate]),
         Command::Submit {
             endpoint,
             contract_code,

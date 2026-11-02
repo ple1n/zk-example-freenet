@@ -1,6 +1,6 @@
 use freenet_stdlib::prelude::*;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sp1_merkle_shared::poseidon2_bytes;
 use sp1_verifier::compressed::SP1CompressedVerifierRaw;
 use zk_notepad_shared::{ContractParameters, NoteCandidate, ProofValues};
 
@@ -36,7 +36,7 @@ fn verify_candidate(
 ) -> Result<NoteState, ContractError> {
     let proof = hex::decode(&candidate.proof)
         .map_err(|e| ContractError::Other(format!("invalid proof encoding: {e}")))?;
-    let text_hash: [u8; 32] = Sha256::digest(candidate.text.as_bytes()).into();
+    let text_hash = poseidon2_bytes(candidate.text.as_bytes());
     let public_values = bincode::serialize(&ProofValues {
         public_y: *public_y,
         counter: candidate.counter,
@@ -57,7 +57,7 @@ fn verify_candidate(
 fn candidate_order(candidate: &NoteState) -> (u64, [u8; 32], &[u8], &[u8]) {
     (
         candidate.counter,
-        Sha256::digest(candidate.text.as_bytes()).into(),
+        poseidon2_bytes(candidate.text.as_bytes()),
         candidate.text.as_bytes(),
         candidate.proof.as_bytes(),
     )
@@ -136,7 +136,7 @@ impl ContractInterface for Sp1NotepadContract {
         if state.is_empty() {
             return Ok(StateSummary::from(Vec::new()));
         }
-        Ok(StateSummary::from(Sha256::digest(state.as_ref()).to_vec()))
+        Ok(StateSummary::from(poseidon2_bytes(state.as_ref()).to_vec()))
     }
 
     fn get_state_delta(
@@ -147,8 +147,8 @@ impl ContractInterface for Sp1NotepadContract {
         if state.is_empty() {
             return Ok(StateDelta::from(Vec::new()));
         }
-        let current_digest = Sha256::digest(state.as_ref());
-        if summary.as_ref() == &current_digest[..] {
+        let current_digest = poseidon2_bytes(state.as_ref());
+        if summary.as_ref() == current_digest {
             return Ok(StateDelta::from(Vec::new()));
         }
         Ok(StateDelta::from(state.as_ref().to_vec()))

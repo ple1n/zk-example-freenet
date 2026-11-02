@@ -28,14 +28,46 @@ pub struct MerkleCandidate {
     pub proof: String,
 }
 
+fn poseidon2_byte_hash(input: &[u8]) -> [u32; 8] {
+    #[cfg(target_os = "zkvm")]
+    {
+        sp1_zkvm::syscalls::Poseidon2ByteHash::hash(input)
+    }
+
+    #[cfg(not(target_os = "zkvm"))]
+    {
+        let mut fields = Vec::new();
+        let mut length_block = [0u8; 24];
+        length_block[..core::mem::size_of::<usize>()].copy_from_slice(&input.len().to_le_bytes());
+        append_byte_block_fields(&mut fields, &length_block);
+        for chunk in input.chunks(24) {
+            let mut block = [0u8; 24];
+            block[..chunk.len()].copy_from_slice(chunk);
+            append_byte_block_fields(&mut fields, &block);
+        }
+        poseidon2_hash(fields.into_iter().map(SP1Field::from_wrapped_u32).collect())
+            .map(|value| value.as_canonical_u32())
+    }
+}
+
+#[cfg(not(target_os = "zkvm"))]
+fn append_byte_block_fields(fields: &mut Vec<u32>, block: &[u8; 24]) {
+    for chunk in block.chunks_exact(3) {
+        fields.push(u32::from_le_bytes([chunk[0], chunk[1], chunk[2], 0]));
+    }
+}
+
+fn digest_words_to_bytes(digest: &[u32; 8]) -> [u8; 32] {
+    core::array::from_fn(|i| digest[i / 4].to_le_bytes()[i % 4])
+}
+
 fn hash_fields(values: &[u32]) -> MerkleNode {
-    poseidon2_hash(
-        values
-            .iter()
-            .map(|value| SP1Field::from_wrapped_u32(*value))
-            .collect(),
-    )
-    .map(|value| value.as_canonical_u32())
+    let mut bytes = Vec::with_capacity(values.len() * 4);
+    for value in values {
+        let canonical = SP1Field::from_wrapped_u32(*value).as_canonical_u32();
+        bytes.extend_from_slice(&canonical.to_le_bytes());
+    }
+    poseidon2_byte_hash(&bytes)
 }
 
 fn seed_fields(seed: &[u8; 32]) -> MerkleNode {
@@ -108,20 +140,7 @@ pub fn membership_witness(
 }
 
 pub fn poseidon2_bytes(input: &[u8]) -> [u8; 32] {
-    let length = input.len() as u64;
-    let mut fields = vec![3, length as u32, (length >> 32) as u32];
-    for chunk in input.chunks(3) {
-        fields.push(
-            chunk
-                .iter()
-                .enumerate()
-                .fold(0u32, |value, (offset, byte)| {
-                    value | (u32::from(*byte) << (offset * 8))
-                }),
-        );
-    }
-    let digest = hash_fields(&fields);
-    core::array::from_fn(|i| digest[i / 4].to_le_bytes()[i % 4])
+    digest_words_to_bytes(&poseidon2_byte_hash(input))
 }
 
 #[cfg(test)]

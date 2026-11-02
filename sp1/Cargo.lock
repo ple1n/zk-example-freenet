@@ -4269,7 +4269,7 @@ dependencies = [
  "hex",
  "serde",
  "serde_json",
- "sha2",
+ "sp1-merkle-shared",
  "sp1-verifier",
  "zk-notepad-shared",
 ]
@@ -4566,6 +4566,7 @@ dependencies = [
  "serde",
  "slop-algebra",
  "sp1-primitives",
+ "sp1-zkvm",
 ]
 
 [[package]]
@@ -4579,9 +4580,9 @@ dependencies = [
  "hex",
  "serde",
  "serde_json",
- "sha2",
  "sp1-build",
  "sp1-host-common",
+ "sp1-merkle-shared",
  "sp1-sdk",
  "sp1-verifier",
  "tokio",
@@ -4593,7 +4594,7 @@ name = "sp1-notepad-guest"
 version = "0.1.0"
 dependencies = [
  "serde",
- "sha2",
+ "sp1-merkle-shared",
  "sp1-zkvm",
  "zk-notepad-shared",
 ]

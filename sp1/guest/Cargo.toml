@@ -1,0 +1,10 @@
+[package]
+name = "sp1-notepad-guest"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde.workspace = true
+sha2.workspace = true
+sp1-zkvm.workspace = true
+zk-notepad-shared.workspace = true

@@ -1,4 +1,4 @@
-# Ziren-authenticated Freenet notepad
+# ZK-authenticated Freenet notepad
 
 This webapp demonstrates a single-note register authenticated by a Ziren
 compressed STARK. The native Rust client holds the 32-byte secret and creates
@@ -139,7 +139,16 @@ npm run build
 The shared hash test uses the reference vector from Ziren's Poseidon2 guest,
 covering its padding, byte packing, and output encoding.
 
-## Test run on my machine 
+## SP1 implementation
+
+An independent SP1 prover and Freenet contract live in [sp1/](./sp1/). This
+is a separate Cargo workspace with its own lockfile and target directory, so
+SP1 builds and WASM size measurements do not include the Ziren dependencies.
+See [sp1/README.md](./sp1/README.md) for proof generation, offline verification,
+and isolated contract build commands. The SP1 implementation uses SHA-256 for
+the secret and text hashes and verifies SP1 compressed proofs.
+
+## Test run for Ziren on my machine 
 
 Lanuch local-only freenet node with
 
@@ -215,3 +224,67 @@ Proof verification took 0.030s
 Candidate proof is valid.
 Verify command took 0.033s
 ```
+
+## Test run with SP1 
+
+I started this experiment with Ziren because SP1 verifier that can run in WASM does not support single-shard proofs (short proofs)
+
+But given how slow Ziren is I'm giving SP1 a try.
+
+Install `protobuf-devel`
+
+```sh
+/e/p/zk-example-freenet (master) [101]> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-notepad-client -- setup \
+                                              --secret secret.bin \
+                                              --output sp1-contract-parameters.json \
+                                              --proving-key sp1-proving-key.bin
+warning: sp1-notepad-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-notepad-client@0.1.0: sp1-notepad-guest built at 2026-11-02 11:18:53
+   Compiling sp1-notepad-client v0.1.0 (/e/proj/zk-example-freenet/sp1/client)
+    Finished `release` profile [optimized] target(s) in 40.13s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-notepad-client setup --secret secret.bin --output sp1-contract-parameters.json --proving-key sp1-proving-key.bin`
+Proving-key setup and cache write took 37.772s
+Wrote public contract parameters to sp1-contract-parameters.json
+Wrote reusable proving key to sp1-proving-key.bin
+Public y: bb3c54e79e088a7214c811618d58b96b8cf8d16a3f348700ae386e6c5505ff69
+Setup command took 37.773s
+
+/e/p/zk-example-freenet (master) [SIGINT]> cargo run -r --manifest-path sp1/Cargo.toml -p sp1-notepad-client -- prove \
+                                                 --secret secret.bin \
+                                                 --parameters sp1-contract-parameters.json \
+                                                 --proving-key sp1-proving-key.bin \
+                                                 --counter 1 \
+                                                 --text "A note authenticated by SP1" \
+                                                 --output sp1-candidate.json
+warning: sp1-notepad-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-notepad-client@0.1.0: sp1-notepad-guest built at 2026-11-02 11:18:53
+   Compiling sp1-notepad-client v0.1.0 (/e/proj/zk-example-freenet/sp1/client)
+    Finished `release` profile [optimized] target(s) in 37.58s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-notepad-client prove --secret secret.bin --parameters sp1-contract-parameters.json --proving-key sp1-proving-key.bin --counter 1 --text 'A note authenticated by SP1' --output sp1-candidate.json`
+Proving-key load took 0.001s
+Proof generation took 94.417s
+Proof verification took 0.043s
+WASM verifier accepts this proof: yes
+Wrote verified update candidate to sp1-candidate.json
+Prove command took 125.704s
+
+/e/p/zk-example-freenet (master) [SIGINT]> 
+                                           cargo run -r --manifest-path sp1/Cargo.toml -p sp1-notepad-client -- verify \
+                                                 --parameters sp1-contract-parameters.json \
+                                                 --candidate sp1-candidate.json
+warning: sp1-notepad-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+warning: sp1-notepad-client@0.1.0: sp1-notepad-guest built at 2026-11-02 11:18:53
+    Finished `release` profile [optimized] target(s) in 0.23s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`
+     Running `/s2a/cargo-target/release/sp1-notepad-client verify --parameters sp1-contract-parameters.json --candidate sp1-candidate.json`
+Proof verification took 0.046s
+WASM verifier accepts this proof: yes
+Candidate proof is valid.
+Verify command took 0.058s
+```
+

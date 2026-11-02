@@ -1,0 +1,22 @@
+[package]
+name = "notepad-client"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+anyhow = "1"
+bincode.workspace = true
+clap = { version = "4", features = ["derive"] }
+hex.workspace = true
+serde_json = "1"
+zk-notepad-shared = { path = "../shared", features = ["hash"] }
+zkm-sdk.workspace = true
+zkm-verifier.workspace = true
+freenet-stdlib = { version = "0.12.1", features = ["net"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tokio-tungstenite = "0.27"
+serde.workspace = true
+
+[build-dependencies]
+zkm-build.workspace = true

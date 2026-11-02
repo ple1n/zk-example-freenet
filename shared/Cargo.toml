@@ -1,0 +1,29 @@
+[package]
+name = "zk-notepad-shared"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde.workspace = true
+
+[features]
+hash = ["dep:zkm-primitives", "dep:p3-field", "dep:p3-koala-bear", "dep:p3-symmetric"]
+
+[dependencies.zkm-primitives]
+workspace = true
+optional = true
+
+[dependencies.p3-field]
+workspace = true
+optional = true
+
+[dependencies.p3-koala-bear]
+workspace = true
+optional = true
+
+[dependencies.p3-symmetric]
+workspace = true
+optional = true
+
+[dev-dependencies]
+hex.workspace = true

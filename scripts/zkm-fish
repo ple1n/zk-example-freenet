@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -e
+
+source "$HOME/.zkm-toolchain/env"
+exec fish "$@"

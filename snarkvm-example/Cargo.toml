@@ -1,0 +1,14 @@
+[package]
+name = "leo-snarkvm-example"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+
+[dependencies]
+anyhow = "1"
+indexmap = "2"
+leo-ast = { path = "../../leo/crates/ast" }
+leo-compiler = { path = "../../leo/crates/compiler" }
+leo-errors = { path = "../../leo/crates/errors" }
+leo-span = { path = "../../leo/crates/span" }
+snarkvm = { path = "../../snarkVM" }

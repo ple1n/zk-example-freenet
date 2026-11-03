@@ -1,5 +1,6 @@
 [workspace]
 members = ["shared", "guest", "client", "container"]
+exclude = ["snarkvm-example"]
 resolver = "2"
 
 [workspace.dependencies]

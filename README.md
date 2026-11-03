@@ -1,11 +1,12 @@
-# ZK-authenticated Freenet notepad
+# ZK experiment collection
 
-This webapp demonstrates a single-note register authenticated by a Ziren
-compressed STARK. The native Rust client holds the 32-byte secret and creates
-proofs using a reusable proving-key artifact. The contract author generates
-the keys once and distributes the proving key to app users. The browser only
-accepts a candidate proof and submits it to the Freenet node; the contract
-verifies it.
+This repository contains independent Ziren, SP1, and snarkVM experiments,
+organized as peer directories. The Ziren experiment demonstrates a single-note
+register authenticated by a compressed STARK. The native Rust client holds the
+32-byte secret and creates proofs using a reusable proving-key artifact. The
+contract author generates the keys once and distributes the proving key to app
+users. The browser only accepts a candidate proof and submits it to the Freenet
+node; the contract verifies it.
 
 The guest proves `Poseidon2(secret) == public_y` and commits
 `(public_y, counter, Poseidon2(UTF-8(text)))`. The contract checks the public
@@ -25,9 +26,40 @@ concurrent updates converge.
 - `fdev` and a running local Freenet node.
 - Node.js and npm.
 
-The Ziren and Plonky3 Git dependencies are pinned in `Cargo.toml`. The guest
-must be rebuilt with that same Ziren revision because its ELF determines the
-verifying key in the contract parameters.
+The Ziren and Plonky3 Git dependencies are pinned in
+[`ziren/Cargo.toml`](./ziren/Cargo.toml). The guest must be rebuilt with that
+same Ziren revision because its ELF determines the verifying key in the
+contract parameters.
+
+## Experiment layout and runner
+
+The three experiment workspaces are siblings: [`ziren/`](./ziren/),
+[`sp1/`](./sp1/), and [`snarkvm/`](./snarkvm/). Each keeps its own Cargo
+workspace and lockfile so the toolchains and dependency graphs remain
+independent. The root [`shared/`](./shared/) crate contains code reused by
+Ziren and SP1.
+
+Run their test workflows sequentially from the collection root:
+
+```sh
+bash scripts/run-experiments.sh
+```
+
+The runner invokes each experiment's `test.sh` in Ziren, SP1, and snarkVM order.
+The Ziren and SP1 scripts run setup, prove, and verify; the snarkVM example
+compiles, executes, proves, and verifies its Leo function. Local secrets and
+outputs are stored within their experiment directories. To include a
+contract-specific benchmark, add `contract-benchmark.sh` to each experiment
+that supports it, then use `--include-contract-benchmarks`. Contract scripts
+are separate from proof correctness checks so they can build or benchmark a
+Freenet contract without coupling those measurements to proving.
+
+To add another experiment, give it a sibling directory, its own Cargo manifest
+and lockfile, and a `test.sh` that uses the shared `run_stage` helper from
+`scripts/common.sh`; then add its directory to the runner's experiment list.
+Keep protocol-specific setup and proof code in that experiment. Put optional
+contract build/submission measurements in its `contract-benchmark.sh` so proof
+benchmarks and Freenet contract benchmarks can be run independently.
 
 Link zkm as toolchain 
 
@@ -39,7 +71,7 @@ To start a fish shell with the Ziren toolchain environment loaded, run this
 from the project root (you usually dont need this):
 
 ```sh
-./scripts/zkm-fish
+./ziren/scripts/zkm-fish
 ```
 
 The script sources `~/.zkm-toolchain/env` in Bash, then starts fish with those
@@ -50,26 +82,27 @@ environment variables. Exit the fish shell to return to the original shell.
 Create a 32-byte secret file and keep it private:
 
 ```sh
-head -c 32 /dev/urandom > secret.bin
+head -c 32 /dev/urandom > ziren/secret.bin
 ```
 
-Generate `contract-parameters.json` and `notepad-proving-key.bin`. This derives
+Generate `ziren/contract-parameters.json` and
+`ziren/notepad-proving-key.bin`. This derives
 the public `y` value from the secret and computes the Ziren proving and
 verifying keys. If the proving-key file already exists, setup reuses it
 instead of recomputing the keys:
 
 ```sh
-cargo run -r -p notepad-client -- setup \
-  --secret secret.bin \
-  --output contract-parameters.json \
-  --proving-key notepad-proving-key.bin
+cargo run --release --manifest-path ziren/Cargo.toml -p notepad-client -- setup \
+  --secret ziren/secret.bin \
+  --output ziren/contract-parameters.json \
+  --proving-key ziren/notepad-proving-key.bin
 ```
 
-Publish the contract with those parameters. `contract-parameters.json` is
+Publish the contract with those parameters. `ziren/contract-parameters.json` is
 public and must be kept alongside the contract instance ID. Distribute
-`notepad-proving-key.bin` to users who need to create proofs; it is not a
+`ziren/notepad-proving-key.bin` to users who need to create proofs; it is not a
 secret, but it must match the guest ELF and pinned Ziren version. Keep
-`secret.bin` private.
+`ziren/secret.bin` private.
 
 Add `--cuda` to `setup` to generate a new key with the CUDA prover, or to
 `prove` to generate the proof with CUDA. The key and proof formats and local
@@ -80,6 +113,7 @@ generation, and local verification.
 ## Build and publish the webapp
 
 ```sh
+cd ziren
 npm install
 PATH="$PWD/node_modules/.bin:$PATH" fdev build
 fdev publish --code build/freenet/container \
@@ -97,43 +131,43 @@ endpoint.
 The counter must increase for a new note to become current:
 
 ```sh
-cargo run -p notepad-client -- prove \
-  --secret secret.bin \
-  --parameters contract-parameters.json \
-  --proving-key notepad-proving-key.bin \
+cargo run --manifest-path ziren/Cargo.toml -p notepad-client -- prove \
+  --secret ziren/secret.bin \
+  --parameters ziren/contract-parameters.json \
+  --proving-key ziren/notepad-proving-key.bin \
   --counter 1 \
   --text "A note authenticated by Ziren" \
-  --output candidate.json
+  --output ziren/candidate.json
 ```
 
 Verify a candidate offline against the contract parameters. This needs neither
 the secret nor the proving key:
 
 ```sh
-cargo run -p notepad-client -- verify \
-  --parameters contract-parameters.json \
-  --candidate candidate.json
+cargo run --manifest-path ziren/Cargo.toml -p notepad-client -- verify \
+  --parameters ziren/contract-parameters.json \
+  --candidate ziren/candidate.json
 ```
 
-Open the webapp, load `candidate.json`, and submit it. The contract stores the
-candidate only if its proof verifies and its counter wins.
+Open the webapp, load `ziren/candidate.json`, and submit it. The contract stores
+the candidate only if its proof verifies and its counter wins.
 
 The same candidate can be submitted directly from the native client:
 
 ```sh
-cargo run -p notepad-client -- submit \
+cargo run --manifest-path ziren/Cargo.toml -p notepad-client -- submit \
   --endpoint ws://127.0.0.1:50509/v1/contract/command?encodingProtocol=native \
-  --contract-code build/freenet/container \
-  --parameters contract-parameters.json \
-  --candidate candidate.json
+  --contract-code ziren/build/freenet/container \
+  --parameters ziren/contract-parameters.json \
+  --candidate ziren/candidate.json
 ```
 
 ## Checks
 
 ```sh
-cargo test -p zk-notepad-shared --features hash
-cargo test -p container
-npm run build
+cargo test --manifest-path shared/Cargo.toml --features hash
+cargo test --manifest-path ziren/Cargo.toml -p container
+(cd ziren && npm run build)
 ```
 
 The shared hash test uses the reference vector from Ziren's Poseidon2 guest,
@@ -148,6 +182,12 @@ The workspace shares host setup, proving-key loading, compressed-proof
 verification, and Freenet submission between its notepad and Poseidon2 Merkle
 membership experiments. See [sp1/README.md](./sp1/README.md) for proof
 generation, offline verification, and separate contract-size measurements.
+
+## Historical test runs
+
+The transcripts below were recorded before the experiment directories were
+introduced, so their command paths reflect the old layout. Use the current
+commands above or `scripts/run-experiments.sh` for the reorganized workspace.
 
 ## Test run for Ziren on my machine 
 
@@ -197,7 +237,7 @@ Public y: f2138227f062911d164e764f7475546dfd7dd26dec56197cce6a5e5a51492479
 Setup command took 79.886s
 
 
-cargo run -r -p notepad-client -- prove \
+cargo run --release --manifest-path ziren/Cargo.toml -p notepad-client -- prove \
   --secret secret.bin \
   --parameters contract-parameters.json \
   --proving-key notepad-proving-key.bin \
@@ -214,7 +254,7 @@ Wrote verified update candidate to candidate.json
 Prove command took 523.530s
 
 
-cargo run -r -p notepad-client -- verify \
+cargo run --release --manifest-path ziren/Cargo.toml -p notepad-client -- verify \
                                --parameters contract-parameters.json \
                                --candidate candidate.json
    Compiling notepad-client v0.1.0 (/e/proj/zk-example-freenet/client)

@@ -1,0 +1,8 @@
+[package]
+name = "notepad-guest"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+zk-notepad-shared = { path = "../../shared" }
+zkm-zkvm = { git = "https://github.com/ProjectZKM/Ziren", rev = "0e2d38388e580f3e061e9bb13d4173d6a614b6a6" }

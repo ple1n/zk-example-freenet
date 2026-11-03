@@ -26,11 +26,12 @@ fn run() -> Result<()> {
     let mut args = std::env::args().skip(1);
     let preimage = args
         .next()
-        .context("usage: snarkvm-example <preimage.field> <expected-hash.field>")?;
-    let expected_hash = args
-        .next()
-        .context("usage: snarkvm-example <preimage.field> <expected-hash.field>")?;
-    ensure!(args.next().is_none(), "expected exactly two field arguments");
+        .context("usage: snarkvm-example <preimage.field> [expected-hash.field]")?;
+    let expected_hash = args.next();
+    ensure!(
+        args.next().is_none(),
+        "expected a preimage and at most one expected hash"
+    );
 
     let source_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/hash_demo.leo");
     let handler = Handler::default();
@@ -51,8 +52,12 @@ fn run() -> Result<()> {
 
     let mut rng = TestRng::default();
     let preimage = Field::<MainnetV0>::from_str(&preimage).context("parsing preimage field")?;
-    let expected_hash = Field::<MainnetV0>::from_str(&expected_hash)
-        .context("parsing expected public hash field")?;
+    let expected_hash = match expected_hash {
+        Some(expected_hash) => Field::<MainnetV0>::from_str(&expected_hash)
+            .context("parsing expected public hash field")?,
+        None => MainnetV0::hash_psd2(std::slice::from_ref(&preimage))
+            .context("computing demo expected hash")?,
+    };
     let inputs = [
         Value::<MainnetV0>::from_str(&preimage.to_string())?,
         Value::<MainnetV0>::from_str(&expected_hash.to_string())?,

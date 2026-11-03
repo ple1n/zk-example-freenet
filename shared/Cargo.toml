@@ -3,27 +3,17 @@ name = "zk-notepad-shared"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+
 [dependencies]
-serde.workspace = true
+serde = { version = "1", features = ["derive"] }
+zkm-primitives = { git = "https://github.com/ProjectZKM/Ziren", rev = "0e2d38388e580f3e061e9bb13d4173d6a614b6a6", optional = true }
+p3-field = { git = "https://github.com/ProjectZKM/Plonky3", optional = true }
+p3-koala-bear = { git = "https://github.com/ProjectZKM/Plonky3", optional = true }
+p3-symmetric = { git = "https://github.com/ProjectZKM/Plonky3", optional = true }
 
 [features]
 hash = ["dep:zkm-primitives", "dep:p3-field", "dep:p3-koala-bear", "dep:p3-symmetric"]
 
-[dependencies.zkm-primitives]
-workspace = true
-optional = true
-
-[dependencies.p3-field]
-workspace = true
-optional = true
-
-[dependencies.p3-koala-bear]
-workspace = true
-optional = true
-
-[dependencies.p3-symmetric]
-workspace = true
-optional = true
-
 [dev-dependencies]
-hex.workspace = true
+hex = "0.4"

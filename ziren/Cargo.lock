@@ -5768,7 +5768,6 @@ dependencies = [
 name = "zk-notepad-shared"
 version = "0.1.0"
 dependencies = [
- "hex",
  "p3-field",
  "p3-koala-bear",
  "p3-symmetric",

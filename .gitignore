@@ -1,10 +1,16 @@
 /node_modules/
+**/node_modules/
 /target/
+/ziren/target/
+/snarkvm/target/
 /container/target/
 /client/target/
 /guest/target/
 /sp1/target/
 /secret.bin
+/ziren/secret.bin
+/sp1/secret.bin
+/snarkvm/secret.bin
 /contract-parameters.json
 .freenet-local/
 build/

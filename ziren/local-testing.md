@@ -9,9 +9,9 @@ Do not use `fdev publish` for local testing.
 From the project root:
 
 ```sh
-cargo test -p zk-notepad-shared --features hash
-cargo test -p container
-npm run build
+cargo test --manifest-path shared/Cargo.toml --features hash
+cargo test --manifest-path ziren/Cargo.toml -p container
+(cd ziren && npm run build)
 ```
 
 These check the shared Poseidon2 encoding, contract logic, and frontend build.
@@ -43,41 +43,38 @@ This runs the node in local-only mode. Its WebSocket API defaults to
 In a second terminal:
 
 ```sh
-cd /e/proj/zk-example-freenet
 unset FREENET_NODE_URL
 
-npm install
-PATH="$PWD/node_modules/.bin:$PATH" fdev build
+(cd ziren && npm install && PATH="$PWD/node_modules/.bin:$PATH" fdev build)
 
-head -c 32 /dev/urandom > secret.bin
-cargo run -p notepad-client -- setup \
-  --secret secret.bin \
-  --output contract-parameters.json \
-  --proving-key notepad-proving-key.bin
-cargo run -p notepad-client -- prove \
-  --secret secret.bin \
-  --parameters contract-parameters.json \
-  --proving-key notepad-proving-key.bin \
+cargo run --manifest-path ziren/Cargo.toml -p notepad-client -- setup \
+  --secret ziren/secret.bin \
+  --output ziren/contract-parameters.json \
+  --proving-key ziren/notepad-proving-key.bin
+cargo run --manifest-path ziren/Cargo.toml -p notepad-client -- prove \
+  --secret ziren/secret.bin \
+  --parameters ziren/contract-parameters.json \
+  --proving-key ziren/notepad-proving-key.bin \
   --counter 1 \
   --text "A local test note" \
-  --output candidate.json
-cargo run -p notepad-client -- verify \
-  --parameters contract-parameters.json \
-  --candidate candidate.json
+  --output ziren/candidate.json
+cargo run --manifest-path ziren/Cargo.toml -p notepad-client -- verify \
+  --parameters ziren/contract-parameters.json \
+  --candidate ziren/candidate.json
 ```
 
-`fdev build` packages the contract at `build/freenet/container`. The `PATH`
-prefix allows `fdev` to find the project's local webpack executable.
-`contract-parameters.json` and `notepad-proving-key.bin` are public artifacts;
-keep `secret.bin` private. The `verify` command checks the candidate offline
-without needing the secret or proving key.
+`fdev build` packages the contract at `ziren/build/freenet/container`. The
+`PATH` prefix allows `fdev` to find the local webpack executable.
+`ziren/contract-parameters.json` and `ziren/notepad-proving-key.bin` are public
+artifacts; keep `ziren/secret.bin` private. The `verify` command checks the
+candidate offline without needing the secret or proving key.
 
 ### 3. Put the contract on the local node
 
 ```sh
 fdev local execute put \
-  --code build/freenet/container \
-  --parameters contract-parameters.json \
+  --code ziren/build/freenet/container \
+  --parameters ziren/contract-parameters.json \
   contract
 ```
 
@@ -92,11 +89,11 @@ Open the webapp through the local node:
 freenet open freenet://<CONTRACT_ID>/
 ```
 
-Load `candidate.json` in the page and submit it. To test the same update
+Load `ziren/candidate.json` in the page and submit it. To test the same update
 without the browser, use:
 
 ```sh
-fdev local execute update <CONTRACT_ID> candidate.json
+fdev local execute update <CONTRACT_ID> ziren/candidate.json
 fdev local execute get <CONTRACT_ID> --output state.json
 ```
 

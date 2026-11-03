@@ -6,13 +6,17 @@ host with snarkVM path dependencies to execute and prove that compiled program.
 It uses in-memory storage and does not start an Aleo node or require a ledger
 service.
 
-Run it from this repository root, supplying the preimage and expected Poseidon2
-hash as field literals:
+Run it from this repository root, supplying the preimage and optionally the
+expected hash as field literals:
 
 ```sh
-cargo run --release --manifest-path snarkvm-example/Cargo.toml -- \
+cargo run --release --manifest-path snarkvm/Cargo.toml -- \
   7field <expected-hash.field>
 ```
+
+Omit the second argument to use the native snarkVM hash of the supplied
+preimage as the public expected value. This is convenient for the automated
+experiment runner; pass an explicit value to test a particular public claim.
 
 The Leo function accepts a private preimage and a public expected hash, hashes
 the preimage with `Poseidon2::hash_to_field`, and asserts that the result equals

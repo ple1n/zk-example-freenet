@@ -1,9 +1,0 @@
-[package]
-name = "notepad-guest"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-zk-notepad-shared = { path = "../shared" }
-zkm-zkvm.workspace = true
-

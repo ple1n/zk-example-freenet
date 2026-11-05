@@ -15,6 +15,7 @@ serde_json.workspace = true
 sp1-sdk.workspace = true
 sp1-host-common.workspace = true
 sp1-merkle-shared.workspace = true
+zk-notepad-shared = { workspace = true, features = ["progress"] }
 tokio.workspace = true
 
 [build-dependencies]

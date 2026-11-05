@@ -1,0 +1,123 @@
+   Compiling zk-notepad-shared v0.1.0 (/e/proj/zk-example-freenet/shared)
+   Compiling sp1-notepad-client v0.1.0 (/e/proj/zk-example-freenet/sp1/client)
+error[E0308]: mismatched types
+   --> /e/proj/zk-example-freenet/shared/src/process.rs:119:21
+    |
+114 |                 print_progress(
+    |                 -------------- arguments to this function are incorrect
+...
+119 |                     terminal.as_deref_mut(),
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^ expected trait `std::io::Write`, found trait `std::io::Write + Send`
+    |
+    = note: expected enum `Option<&mut dyn std::io::Write>`
+               found enum `Option<&mut dyn std::io::Write + Send>`
+note: function defined here
+   --> /e/proj/zk-example-freenet/shared/src/process.rs:159:4
+    |
+159 | fn print_progress(
+    |    ^^^^^^^^^^^^^^
+...
+164 |     terminal: Option<&mut dyn Write>,
+    |     --------------------------------
+
+error[E0308]: mismatched types
+   --> /e/proj/zk-example-freenet/shared/src/process.rs:125:20
+    |
+125 |     clear_progress(terminal.as_deref_mut());
+    |     -------------- ^^^^^^^^^^^^^^^^^^^^^^^ expected trait `std::io::Write`, found trait `std::io::Write + Send`
+    |     |
+    |     arguments to this function are incorrect
+    |
+    = note: expected enum `Option<&mut dyn std::io::Write>`
+               found enum `Option<&mut dyn std::io::Write + Send>`
+note: function defined here
+   --> /e/proj/zk-example-freenet/shared/src/process.rs:195:4
+    |
+195 | fn clear_progress(terminal: Option<&mut dyn Write>) {
+    |    ^^^^^^^^^^^^^^ --------------------------------
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `zk-notepad-shared` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+warning: sp1-notepad-client@0.1.0: rustc +succinct --version: "rustc 1.96.0-dev\n"
+error: failed to run custom build command for `sp1-notepad-client v0.1.0 (/e/proj/zk-example-freenet/sp1/client)`
+
+Caused by:
+  process didn't exit successfully: `/s2a/cargo-target/release/build/sp1-notepad-client/7cef768a53559036/out/build_script_build` (exit status: 101)
+  --- stdout
+  cargo::rerun-if-changed=/e/proj/zk-example-freenet/sp1/guest/src
+  cargo::rerun-if-changed=/e/proj/zk-example-freenet/sp1/guest/Cargo.toml
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/sp1/Cargo.lock
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/sp1/merkle-shared
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/shared
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/shared
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/sp1/host-common
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/sp1/merkle-shared
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/shared
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/sp1/merkle-shared
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/sp1/merkle-shared
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/sp1/host-common
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/sp1/merkle-shared
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/shared
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/sp1/merkle-shared
+  cargo:rerun-if-changed=/e/proj/zk-example-freenet/shared
+  cargo:warning=rustc +succinct --version: "rustc 1.96.0-dev\n"
+
+  --- stderr
+  [sp1]     Compiling zk-notepad-shared v0.1.0 (/e/proj/zk-example-freenet/shared)
+  [sp1]  warning: unused import: `poseidon2_hash`
+  [sp1]   --> merkle-shared/src/lib.rs:8:22
+  [sp1]    |
+  [sp1]  8 | use sp1_primitives::{poseidon2_hash, SP1Field};
+  [sp1]    |                      ^^^^^^^^^^^^^^
+  [sp1]    |
+  [sp1]    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+  [sp1]  
+  [sp1]  warning: `sp1-merkle-shared` (lib) generated 1 warning (run `cargo fix --lib -p sp1-merkle-shared` to apply 1 suggestion)
+  [sp1]  warning: unused import: `fs::OpenOptions`
+  [sp1]   --> /e/proj/zk-example-freenet/shared/src/process.rs:2:5
+  [sp1]    |
+  [sp1]  2 |     fs::OpenOptions,
+  [sp1]    |     ^^^^^^^^^^^^^^^
+  [sp1]    |
+  [sp1]    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+  [sp1]  
+  [sp1]  error[E0308]: mismatched types
+  [sp1]     --> /e/proj/zk-example-freenet/shared/src/process.rs:119:21
+  [sp1]      |
+  [sp1]  114 |                 print_progress(
+  [sp1]      |                 -------------- arguments to this function are incorrect
+  [sp1]  ...
+  [sp1]  119 |                     terminal.as_deref_mut(),
+  [sp1]      |                     ^^^^^^^^^^^^^^^^^^^^^^^ expected trait `std::io::Write`, found trait `std::io::Write + Send`
+  [sp1]      |
+  [sp1]      = note: expected enum `std::option::Option<&mut dyn std::io::Write>`
+  [sp1]                 found enum `std::option::Option<&mut dyn std::io::Write + Send>`
+  [sp1]  note: function defined here
+  [sp1]     --> /e/proj/zk-example-freenet/shared/src/process.rs:159:4
+  [sp1]      |
+  [sp1]  159 | fn print_progress(
+  [sp1]      |    ^^^^^^^^^^^^^^
+  [sp1]  ...
+  [sp1]  164 |     terminal: Option<&mut dyn Write>,
+  [sp1]      |     --------------------------------
+  [sp1]  
+  [sp1]  error[E0308]: mismatched types
+  [sp1]     --> /e/proj/zk-example-freenet/shared/src/process.rs:125:20
+  [sp1]      |
+  [sp1]  125 |     clear_progress(terminal.as_deref_mut());
+  [sp1]      |     -------------- ^^^^^^^^^^^^^^^^^^^^^^^ expected trait `std::io::Write`, found trait `std::io::Write + Send`
+  [sp1]      |     |
+  [sp1]      |     arguments to this function are incorrect
+  [sp1]      |
+  [sp1]      = note: expected enum `std::option::Option<&mut dyn std::io::Write>`
+  [sp1]                 found enum `std::option::Option<&mut dyn std::io::Write + Send>`
+  [sp1]  note: function defined here
+  [sp1]     --> /e/proj/zk-example-freenet/shared/src/process.rs:195:4
+  [sp1]      |
+  [sp1]  195 | fn clear_progress(terminal: Option<&mut dyn Write>) {
+  [sp1]      |    ^^^^^^^^^^^^^^ --------------------------------
+  [sp1]  
+  [sp1]  For more information about this error, try `rustc --explain E0308`.
+  [sp1]  warning: `zk-notepad-shared` (lib) generated 1 warning
+  [sp1]  error: could not compile `zk-notepad-shared` (lib) due to 2 previous errors; 1 warning emitted

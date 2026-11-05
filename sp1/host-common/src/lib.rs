@@ -2,11 +2,6 @@ use std::{
     fs,
     future::Future,
     path::Path,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
-    },
-    thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
 
@@ -17,146 +12,19 @@ use freenet_stdlib::{
 };
 use sp1_sdk::{Elf, Prover, ProverClient, ProvingKey, SP1ProvingKey, SP1Stdin};
 use sp1_verifier::compressed::SP1CompressedVerifierRaw;
-use sysinfo::{Pid, ProcessRefreshKind, System};
-
-const RESOURCE_SAMPLE_INTERVAL: Duration = Duration::from_secs(1);
-
-#[derive(Default)]
-struct ResourceSample {
-    cpu_percent: Option<f32>,
-    memory_bytes: u64,
-    peak_memory_bytes: u64,
-}
-
-pub struct ResourceMonitor {
-    label: String,
-    started: Instant,
-    stopped: Arc<AtomicBool>,
-    sample: Arc<Mutex<ResourceSample>>,
-    ticker: Option<JoinHandle<()>>,
-}
-
-impl ResourceMonitor {
-    pub fn start(label: &str) -> anyhow::Result<Self> {
-        let started = Instant::now();
-        let stopped = Arc::new(AtomicBool::new(false));
-        let sample = Arc::new(Mutex::new(ResourceSample::default()));
-        let thread_stopped = Arc::clone(&stopped);
-        let thread_sample = Arc::clone(&sample);
-        let thread_label = label.to_owned();
-        let pid = Pid::from_u32(std::process::id());
-        let ticker = thread::Builder::new()
-            .name("sp1-resource-monitor".to_owned())
-            .spawn(move || {
-                let mut system = System::new();
-                let refresh_kind =
-                    ProcessRefreshKind::new().with_memory().with_cpu();
-                system.refresh_process_specifics(pid, refresh_kind);
-                let mut process_found = system.process(pid).is_some();
-                if !process_found {
-                    eprintln!(
-                        "[{thread_label}] resource monitor could not read this process's metrics"
-                    );
-                }
-
-                while !thread_stopped.load(Ordering::Relaxed) {
-                    if process_found {
-                        system.refresh_process_specifics(pid, refresh_kind);
-                        if let Some(process) = system.process(pid) {
-                            let mut current = thread_sample
-                                .lock()
-                                .expect("resource sample lock poisoned");
-                            current.cpu_percent = Some(process.cpu_usage());
-                            current.memory_bytes = process.memory();
-                            current.peak_memory_bytes =
-                                current.peak_memory_bytes.max(current.memory_bytes);
-                            print_resource_tick(
-                                &thread_label,
-                                started.elapsed(),
-                                &current,
-                            );
-                        } else {
-                            process_found = false;
-                            eprintln!(
-                                "[{thread_label}] resource monitor lost access to this process's metrics"
-                            );
-                        }
-                    }
-                    thread::park_timeout(RESOURCE_SAMPLE_INTERVAL);
-                }
-            })
-            .context("starting SP1 resource monitor thread")?;
-
-        Ok(Self {
-            label: label.to_owned(),
-            started,
-            stopped,
-            sample,
-            ticker: Some(ticker),
-        })
-    }
-
-    fn finish(&mut self) {
-        self.stopped.store(true, Ordering::Relaxed);
-        if let Some(ticker) = self.ticker.take() {
-            ticker.thread().unpark();
-            if ticker.join().is_err() {
-                eprintln!(
-                    "[{}] resource monitor thread terminated unexpectedly",
-                    self.label
-                );
-            }
-        }
-
-        let elapsed = self.started.elapsed();
-        let sample = self.sample.lock().expect("resource sample lock poisoned");
-        println!(
-            "\n[{}] finished in {:.1}s | peak memory {:.1} MiB",
-            self.label,
-            elapsed.as_secs_f64(),
-            bytes_to_mib(sample.peak_memory_bytes),
-        );
-    }
-}
-
-impl Drop for ResourceMonitor {
-    fn drop(&mut self) {
-        self.finish();
-    }
-}
-
-fn print_resource_tick(label: &str, elapsed: Duration, sample: &ResourceSample) {
-    let cpu = sample
-        .cpu_percent
-        .map_or_else(|| "n/a".to_owned(), |usage| format!("{usage:.1}%"));
-    print!(
-        "\r[{label}] elapsed {:.1}s | CPU {cpu} | memory {:.1} MiB | peak {:.1} MiB",
-        elapsed.as_secs_f64(),
-        bytes_to_mib(sample.memory_bytes),
-        bytes_to_mib(sample.peak_memory_bytes),
-    );
-    use std::io::Write;
-    let _ = std::io::stdout().flush();
-}
-
-fn bytes_to_mib(bytes: u64) -> f64 {
-    bytes as f64 / (1024.0 * 1024.0)
-}
 
 pub async fn monitor_async<T>(
     label: &str,
     operation: impl Future<Output = anyhow::Result<T>>,
 ) -> anyhow::Result<T> {
-    let _monitor = ResourceMonitor::start(label)?;
-    operation.await
+    zk_notepad_shared::process::measure_async(label, operation).await
 }
 
 pub fn monitor_sync<T>(
     label: &str,
     operation: impl FnOnce() -> anyhow::Result<T>,
 ) -> anyhow::Result<T> {
-    let _monitor = ResourceMonitor::start(label)?;
-    operation()
+    zk_notepad_shared::process::measure(label, operation)
 }
 
 pub async fn count_guest_cycles(elf: &Elf, stdin: &SP1Stdin) -> anyhow::Result<u64> {

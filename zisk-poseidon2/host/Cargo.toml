@@ -1,0 +1,12 @@
+[package]
+name = "zisk-poseidon2-host"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[dependencies]
+zisk-sdk = { path = "../../../zisk/sdk" }
+ziskos = { path = "../../../zisk/ziskos/entrypoint" }
+
+[build-dependencies]
+zisk-sdk = { path = "../../../zisk/sdk" }

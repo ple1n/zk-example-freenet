@@ -1,0 +1,19 @@
+[package]
+name = "sp1-keccak-client"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+anyhow.workspace = true
+bincode.workspace = true
+clap.workspace = true
+tiny-keccak.workspace = true
+sp1-sdk.workspace = true
+sp1-host-common.workspace = true
+sp1-merkle-shared.workspace = true
+zk-notepad-shared.workspace = true
+tokio.workspace = true
+
+[build-dependencies]
+sp1-build.workspace = true

@@ -4,13 +4,17 @@ This directory contains the Ziren notepad workspace and its Freenet contract
 sources. The collection-level [README](../README.md) documents setup, proof
 generation, verification, and contract publishing.
 
-Run the complete setup, prove, and verify flow from the collection root with:
+Configure the Ziren toolchain separately, then run setup or the complete
+workflow:
 
 ```sh
-bash ziren/test.sh
+source ziren/env.sh
+bash ziren/setup.sh
+bash ziren/run_all.sh
 ```
 
-The script creates a local secret if needed and keeps parameters, proving key,
-and candidate artifacts inside this directory. To add a contract benchmark,
-provide `contract-benchmark.sh` here; the collection runner can invoke it with
+`run_all.sh` repeats setup before proving and verifying and creates a local
+secret if needed. Output is printed directly to the terminal. Parameters, proving key, and candidate
+artifacts stay inside this directory. To add a contract benchmark, provide
+`contract-benchmark.sh` here; the collection runner can invoke it with
 `--include-contract-benchmarks`.

@@ -5768,10 +5768,12 @@ dependencies = [
 name = "zk-notepad-shared"
 version = "0.1.0"
 dependencies = [
+ "indicatif",
  "p3-field",
  "p3-koala-bear",
  "p3-symmetric",
  "serde",
+ "sysinfo",
  "zkm-primitives 2.0.0 (git+https://github.com/ProjectZKM/Ziren?rev=0e2d38388e580f3e061e9bb13d4173d6a614b6a6)",
 ]
 

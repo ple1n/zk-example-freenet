@@ -7,6 +7,7 @@
 /client/target/
 /guest/target/
 /sp1/target/
+/sp1-keccak/target/
 /secret.bin
 /ziren/secret.bin
 /sp1/secret.bin

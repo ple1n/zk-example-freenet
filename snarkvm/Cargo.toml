@@ -12,3 +12,4 @@ leo-compiler = { path = "../../leo/crates/compiler" }
 leo-errors = { path = "../../leo/crates/errors" }
 leo-span = { path = "../../leo/crates/span" }
 snarkvm = { path = "../../snarkVM" }
+zk-notepad-shared = { path = "../shared" }

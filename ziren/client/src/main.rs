@@ -7,7 +7,9 @@ use freenet_stdlib::{
     prelude::{ContractCode, ContractKey, Parameters, StateDelta, UpdateData},
 };
 use serde::Serialize;
-use zk_notepad_shared::{poseidon2_bytes, ContractParameters, NoteCandidate, ProofValues};
+use zk_notepad_shared::{
+    poseidon2_bytes, process::measure_async, ContractParameters, NoteCandidate, ProofValues,
+};
 use zkm_sdk::{include_elf, ProverClient, ZKMProvingKey, ZKMStdin};
 use zkm_verifier::StarkVerifier;
 
@@ -328,31 +330,41 @@ async fn submit(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    match Cli::parse().command {
-        Command::Setup {
-            secret,
-            output,
-            proving_key,
-            cuda,
-        } => setup(secret, output, proving_key, cuda),
-        Command::Prove {
-            secret,
-            parameters,
-            proving_key,
-            counter,
-            text,
-            output,
-            cuda,
-        } => prove(secret, parameters, proving_key, counter, text, output, cuda),
-        Command::Verify {
-            parameters,
-            candidate,
-        } => verify(parameters, candidate),
-        Command::Submit {
-            endpoint,
-            contract_code,
-            parameters,
-            candidate,
-        } => submit(endpoint, contract_code, parameters, candidate).await,
-    }
+    let command = Cli::parse().command;
+    let label = match &command {
+        Command::Setup { .. } => "Ziren setup",
+        Command::Prove { .. } => "Ziren prove",
+        Command::Verify { .. } => "Ziren verify",
+        Command::Submit { .. } => "Ziren submit",
+    };
+    measure_async(label, async move {
+        match command {
+            Command::Setup {
+                secret,
+                output,
+                proving_key,
+                cuda,
+            } => setup(secret, output, proving_key, cuda),
+            Command::Prove {
+                secret,
+                parameters,
+                proving_key,
+                counter,
+                text,
+                output,
+                cuda,
+            } => prove(secret, parameters, proving_key, counter, text, output, cuda),
+            Command::Verify {
+                parameters,
+                candidate,
+            } => verify(parameters, candidate),
+            Command::Submit {
+                endpoint,
+                contract_code,
+                parameters,
+                candidate,
+            } => submit(endpoint, contract_code, parameters, candidate).await,
+        }
+    })
+    .await
 }

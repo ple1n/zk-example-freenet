@@ -4437,9 +4437,9 @@ dependencies = [
  "sp1-prover",
  "sp1-sdk",
  "sp1-verifier",
- "sysinfo",
  "tokio",
  "tokio-tungstenite",
+ "zk-notepad-shared",
 ]
 
 [[package]]
@@ -4534,6 +4534,7 @@ dependencies = [
  "sp1-merkle-shared",
  "sp1-sdk",
  "tokio",
+ "zk-notepad-shared",
 ]
 
 [[package]]
@@ -6221,7 +6222,9 @@ dependencies = [
 name = "zk-notepad-shared"
 version = "0.1.0"
 dependencies = [
+ "indicatif",
  "serde",
+ "sysinfo",
 ]
 
 [[package]]

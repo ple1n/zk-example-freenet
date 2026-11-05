@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "progress")]
+pub mod process;
+
 #[cfg(feature = "hash")]
 use p3_field::{FieldAlgebra, PrimeField32};
 #[cfg(feature = "hash")]

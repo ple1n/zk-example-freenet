@@ -7,7 +7,21 @@ proving-key setup/loading, compressed-proof verification, and Freenet update
 submission. Each program still has its own guest ELF, parameters, and contract.
 
 Run commands from the repository root with the normal Rust toolchain, not the
-Ziren shell launcher.
+Ziren shell launcher. The experiment scripts are:
+
+```sh
+source sp1/env.sh
+bash sp1/setup.sh
+bash sp1/run_all.sh
+```
+
+Sourcing the environment also sets `DIR` to the SP1 experiment directory, so
+commands copied from `run_all.sh` that use `"$DIR/..."` work in the same shell.
+`setup.sh` prepares the SP1 secrets, parameters, and proving keys.
+`run_all.sh` runs setup followed by both proof and verification workflows and
+prints output directly to the terminal. `env.sh` sets
+`SP1_MERKLE_DEPTH` (default `16`); use `sp1/env.fish` when sourcing the
+environment from Fish.
 
 ## SP1 notepad
 

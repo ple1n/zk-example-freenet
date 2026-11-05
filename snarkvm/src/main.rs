@@ -14,12 +14,15 @@ use snarkvm::{
     prelude::{Field, Identifier, InclusionVersion, PrivateKey, Process, Program, TestRng, Value},
 };
 use std::{path::Path, rc::Rc, str::FromStr};
+use zk_notepad_shared::process::measure;
 
 const PROGRAM_NAME: &str = "leo_demo.aleo";
 const FUNCTION_NAME: &str = "prove_preimage";
 
 fn main() -> Result<()> {
-    create_session_if_not_set_then(|_| run())
+    measure("snarkVM compile, execute, prove, and verify", || {
+        create_session_if_not_set_then(|_| run())
+    })
 }
 
 fn run() -> Result<()> {

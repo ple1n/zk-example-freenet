@@ -1,0 +1,16 @@
+[workspace]
+members = ["client", "guest"]
+resolver = "2"
+
+[workspace.dependencies]
+anyhow = "1"
+bincode = "1"
+clap = { version = "4", features = ["derive"] }
+tiny-keccak = { version = "2", features = ["keccak"] }
+sp1-build = "6.0.0"
+sp1-sdk = "6.0.0"
+sp1-zkvm = "6.0.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+sp1-host-common = { path = "../sp1/host-common" }
+sp1-merkle-shared = { path = "../sp1/merkle-shared" }
+zk-notepad-shared = { path = "../shared" }

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-source "$ROOT/scripts/common.sh"
 cd "$ROOT"
+export LC_ALL=C
 
 include_contract_benchmarks=0
 if [[ "${1:-}" == "--include-contract-benchmarks" ]]; then
@@ -15,13 +15,16 @@ if [[ "$#" -ne 0 ]]; then
     exit 2
 fi
 
-for experiment in ziren sp1 snarkvm; do
+shopt -s nullglob
+run_scripts=("$ROOT"/*/run_all.sh)
+if (("${#run_scripts[@]}" == 0)); then
+    echo "No experiment run_all.sh scripts found." >&2
+    exit 1
+fi
+
+for run_script in "${run_scripts[@]}"; do
+    experiment=$(basename "$(dirname "$run_script")")
     printf '\n######## %s experiment ########\n' "$experiment"
-    run_script="$ROOT/$experiment/test.sh"
-    if [[ ! -f "$run_script" ]]; then
-        echo "Missing experiment runner: $run_script" >&2
-        exit 1
-    fi
     bash "$run_script"
 
     if (( include_contract_benchmarks )); then

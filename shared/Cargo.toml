@@ -7,12 +7,18 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+sysinfo = "0.30.13"
 zkm-primitives = { git = "https://github.com/ProjectZKM/Ziren", rev = "0e2d38388e580f3e061e9bb13d4173d6a614b6a6", optional = true }
 p3-field = { git = "https://github.com/ProjectZKM/Plonky3", optional = true }
 p3-koala-bear = { git = "https://github.com/ProjectZKM/Plonky3", optional = true }
 p3-symmetric = { git = "https://github.com/ProjectZKM/Plonky3", optional = true }
 
+[target.'cfg(not(target_arch = "riscv32"))'.dependencies]
+indicatif = { version = "0.17.11", optional = true }
+
 [features]
+default = ["progress"]
+progress = ["dep:indicatif"]
 hash = ["dep:zkm-primitives", "dep:p3-field", "dep:p3-koala-bear", "dep:p3-symmetric"]
 
 [dev-dependencies]

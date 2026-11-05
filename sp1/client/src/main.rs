@@ -12,7 +12,7 @@ use sp1_sdk::{
     include_elf, Elf, HashableKey, ProveRequest, Prover, ProverClient, ProvingKey, SP1Proof,
     SP1Stdin,
 };
-use zk_notepad_shared::{ContractParameters, NoteCandidate, ProofValues};
+use zk_notepad_shared::{process::measure_async, ContractParameters, NoteCandidate, ProofValues};
 
 const GUEST_ELF: Elf = include_elf!("sp1-notepad-guest");
 
@@ -356,12 +356,22 @@ async fn main() -> anyhow::Result<()> {
             parameters,
             proving_key,
             candidate,
-        } => clear([secret, parameters, proving_key, candidate]),
+        } => {
+            measure_async("SP1 clear", async {
+                clear([secret, parameters, proving_key, candidate])
+            })
+            .await
+        }
         Command::Submit {
             endpoint,
             contract_code,
             parameters,
             candidate,
-        } => submit(endpoint, contract_code, parameters, candidate).await,
+        } => {
+            measure_async("SP1 submit", async {
+                submit(endpoint, contract_code, parameters, candidate).await
+            })
+            .await
+        }
     }
 }

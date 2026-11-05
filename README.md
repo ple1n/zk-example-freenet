@@ -33,33 +33,57 @@ contract parameters.
 
 ## Experiment layout and runner
 
-The three experiment workspaces are siblings: [`ziren/`](./ziren/),
-[`sp1/`](./sp1/), and [`snarkvm/`](./snarkvm/). Each keeps its own Cargo
-workspace and lockfile so the toolchains and dependency graphs remain
-independent. The root [`shared/`](./shared/) crate contains code reused by
-Ziren and SP1.
+The experiment workspaces are siblings: [`ziren/`](./ziren/), [`sp1/`](./sp1/),
+[`snarkvm/`](./snarkvm/), [`sp1-keccak/`](./sp1-keccak/), and
+[`snarkvm-keccak-poseidon/`](./snarkvm-keccak-poseidon/). Each keeps its own
+Cargo workspace or package and lockfile so toolchains and dependency graphs
+remain independent. The root [`shared/`](./shared/) crate contains code reused
+by Ziren and SP1, plus an in-process resource measurement library used by the
+native clients.
 
-Run their test workflows sequentially from the collection root:
+Each experiment has its own `setup.sh` and `run_all.sh`. Experiments with
+environment configuration keep that in a separate `env.sh` (or `env.fish`).
+Source the matching environment script when you want to configure your current
+shell without generating artifacts; run `setup.sh` when you want to prepare the
+experiment without the full workflow:
+
+```sh
+source snarkvm-keccak-poseidon/env.sh
+bash snarkvm-keccak-poseidon/setup.sh
+
+# Fish
+source snarkvm-keccak-poseidon/env.fish
+source ziren/env.fish
+
+bash sp1/setup.sh
+bash sp1/run_all.sh
+```
+
+`run_all.sh` loads its `env.sh` if present, runs setup, then the experiment's
+prove/verify steps. Output is printed directly to the terminal.
+Run all experiments sequentially from the collection root with:
 
 ```sh
 bash scripts/run-experiments.sh
 ```
 
-The runner invokes each experiment's `test.sh` in Ziren, SP1, and snarkVM order.
-The Ziren and SP1 scripts run setup, prove, and verify; the snarkVM example
-compiles, executes, proves, and verifies its Leo function. Local secrets and
-outputs are stored within their experiment directories. To include a
-contract-specific benchmark, add `contract-benchmark.sh` to each experiment
-that supports it, then use `--include-contract-benchmarks`. Contract scripts
-are separate from proof correctness checks so they can build or benchmark a
-Freenet contract without coupling those measurements to proving.
+The runner discovers and executes every experiment directory's `run_all.sh` in
+alphabetical order. Native clients use the shared measurer for their commands
+or resource-intensive phases, reporting elapsed time, CPU use, and resident
+memory; Cargo compilation happens outside the measured runtime. Local secrets
+and outputs are stored within their experiment directories. To include a
+contract-specific benchmark, add `contract-benchmark.sh` to each
+experiment that supports it, then use `--include-contract-benchmarks`. Contract
+scripts are separate from proof correctness checks so they can build or
+benchmark a Freenet contract without coupling those measurements to proving.
 
 To add another experiment, give it a sibling directory, its own Cargo manifest
-and lockfile, and a `test.sh` that uses the shared `run_stage` helper from
-`scripts/common.sh`; then add its directory to the runner's experiment list.
-Keep protocol-specific setup and proof code in that experiment. Put optional
-contract build/submission measurements in its `contract-benchmark.sh` so proof
-benchmarks and Freenet contract benchmarks can be run independently.
+and lockfile, and `setup.sh` and `run_all.sh` scripts. Keep the scripts simple:
+use the native client for resource measurements, not shell wrappers. The
+collection runner discovers `run_all.sh` automatically. Keep protocol-specific
+setup and proof code in that experiment. Put optional contract build/submission
+measurements in its `contract-benchmark.sh` so proof benchmarks and Freenet
+contract benchmarks can be run independently.
 
 Link zkm as toolchain 
 

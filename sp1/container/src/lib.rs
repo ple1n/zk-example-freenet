@@ -4,6 +4,15 @@ use sp1_merkle_shared::poseidon2_bytes;
 use sp1_verifier::compressed::SP1CompressedVerifierRaw;
 use zk_notepad_shared::{ContractParameters, NoteCandidate, ProofValues};
 
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+unsafe extern "Rust" fn __getrandom_v02_custom(
+    _dest: *mut u8,
+    _len: usize,
+) -> Result<(), getrandom::Error> {
+    Err(getrandom::Error::UNSUPPORTED)
+}
+
 #[derive(Deserialize, Serialize)]
 struct NoteState {
     counter: u64,

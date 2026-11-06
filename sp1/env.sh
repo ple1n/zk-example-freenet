@@ -2,3 +2,5 @@
 
 export DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 export SP1_MERKLE_DEPTH=${SP1_MERKLE_DEPTH:-16}
+TARGET_DIR=$(cargo metadata --no-deps --format-version 1 --manifest-path "$DIR/Cargo.toml" | jq -er .target_directory) || return 1
+export TARGET_DIR

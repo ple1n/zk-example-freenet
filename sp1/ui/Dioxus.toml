@@ -1,0 +1,11 @@
+[application]
+name = "sp1-ui"
+default_platform = "web"
+out_dir = "dist"
+asset_dir = "assets"
+
+[web.app]
+title = "SP1 contract tester"
+
+[web.watcher]
+watch_path = ["src", "assets"]

@@ -8,6 +8,7 @@ members = [
     "merkle-container",
     "merkle-guest",
     "merkle-shared",
+    "ui",
 ]
 resolver = "2"
 

@@ -4,6 +4,15 @@ use sp1_merkle_shared::{
 };
 use sp1_verifier::compressed::SP1CompressedVerifierRaw;
 
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+unsafe extern "Rust" fn __getrandom_v02_custom(
+    _dest: *mut u8,
+    _len: usize,
+) -> Result<(), getrandom::Error> {
+    Err(getrandom::Error::UNSUPPORTED)
+}
+
 fn parse_parameters(bytes: &[u8]) -> Result<(MerkleContractParameters, Vec<u8>), ContractError> {
     let params: MerkleContractParameters =
         serde_json::from_slice(bytes).map_err(|e| ContractError::Deser(e.to_string()))?;

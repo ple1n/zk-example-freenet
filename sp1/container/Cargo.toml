@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 bincode.workspace = true
-freenet-stdlib = { workspace = true, features = ["contract"] }
-getrandom = { version = "0.2", features = ["js"] }
+freenet-stdlib.workspace = true
+getrandom = { version = "0.2", features = ["custom"] }
 hex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -16,3 +16,8 @@ sp1-merkle-shared.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
+
+[features]
+contract = ["freenet-stdlib/contract"]
+default = ["freenet-main-contract", "contract"]
+freenet-main-contract = []

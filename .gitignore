@@ -18,3 +18,12 @@ build/
 *candidate*
 *.bin
 *.json
+!/stwo-cairo/dev-prover-parameters.json
+
+# Stwo Cairo generated outputs
+/stwo-cairo/.venv/
+/stwo-cairo/artifacts/
+/stwo-cairo/build/
+/stwo-cairo/target/
+/stwo-cairo/cairo/target/
+/stwo-cairo/ui/target/

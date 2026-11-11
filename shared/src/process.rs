@@ -57,6 +57,7 @@ impl Measurement {
         E: From<io::Error>,
     {
         let elapsed = self.started.elapsed();
+        let elapsed_ms = rounded_milliseconds(elapsed);
         self.stop
             .send(())
             .map_err(|error| E::from(io::Error::other(error)))?;
@@ -66,10 +67,10 @@ impl Measurement {
             .map_err(|_| E::from(io::Error::other("resource monitor thread panicked")))?;
         marker(
             &format!(
-                "== {} {} in {:.1}s | CPU {:.1}% (peak {:.1}%) | memory {} MiB (peak {} MiB) ==",
+                "== {} {} in {} ms | CPU {:.1}% (peak {:.1}%) | memory {} MiB (peak {} MiB) ==",
                 self.label,
                 if result.is_ok() { "finished" } else { "failed" },
-                elapsed.as_secs_f64(),
+                elapsed_ms,
                 metrics.cpu,
                 metrics.peak_cpu,
                 metrics.memory / 1_048_576,
@@ -86,6 +87,10 @@ where
     E: From<io::Error>,
 {
     Measurement::start(label)?.finish(operation())
+}
+
+fn rounded_milliseconds(elapsed: Duration) -> u128 {
+    elapsed.as_nanos().saturating_add(500_000) / 1_000_000
 }
 
 pub async fn measure_async<T, E>(
@@ -118,7 +123,9 @@ fn monitor_process(
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 sample(&mut system, pid, &mut metrics);
-                update_progress(&progress_bars, &label, started.elapsed(), &metrics);
+                if !progress_bars.is_empty() {
+                    update_progress(&progress_bars, &label, started.elapsed(), &metrics);
+                }
             }
         }
     }
@@ -139,13 +146,18 @@ fn sample(system: &mut System, pid: Pid, metrics: &mut Metrics) {
 }
 
 fn marker(text: &str, color: &str) {
-    let text = if io::stderr().is_terminal() {
+    let is_terminal = io::stderr().is_terminal();
+    let text = if is_terminal {
         format!("\x1b[1;{color}m{text}\x1b[0m")
     } else {
         text.to_owned()
     };
-    if let Err(error) = progress().println(text) {
-        eprintln!("failed to print resource measurement: {error}");
+    if is_terminal {
+        if let Err(error) = progress().println(text) {
+            eprintln!("failed to print resource measurement: {error}");
+        }
+    } else {
+        eprintln!("{text}");
     }
 }
 
@@ -154,6 +166,9 @@ fn progress() -> &'static MultiProgress {
 }
 
 fn progress_bars() -> Vec<ProgressBar> {
+    if !io::stderr().is_terminal() {
+        return Vec::new();
+    }
     (0..4)
         .map(|_| {
             let bar = progress().add(ProgressBar::new_spinner());
@@ -181,4 +196,23 @@ fn update_progress(bars: &[ProgressBar], label: &str, elapsed: Duration, metrics
         metrics.memory / 1_048_576,
         metrics.peak_memory / 1_048_576,
     ));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{measure, rounded_milliseconds};
+    use std::{io, time::Duration};
+
+    #[test]
+    fn measurement_returns_the_operation_result() {
+        let result = measure("measurement test", || Ok::<_, io::Error>(42)).unwrap();
+
+        assert_eq!(result, 42);
+    }
+
+    #[test]
+    fn elapsed_time_rounds_to_nearest_millisecond() {
+        assert_eq!(rounded_milliseconds(Duration::from_nanos(1_499_999)), 1);
+        assert_eq!(rounded_milliseconds(Duration::from_nanos(1_500_000)), 2);
+    }
 }

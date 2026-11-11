@@ -1,0 +1,11 @@
+[application]
+name = "stwo-cairo-ui"
+default_platform = "web"
+out_dir = "dist"
+asset_dir = "assets"
+
+[web.app]
+title = "Stwo Cairo contract tester"
+
+[web.watcher]
+watch_path = ["src", "assets"]

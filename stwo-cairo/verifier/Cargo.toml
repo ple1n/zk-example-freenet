@@ -1,0 +1,13 @@
+[package]
+name = "stwo-cairo-verifier"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bincode.workspace = true
+bzip2.workspace = true
+cairo-air.workspace = true
+hex = "0.4"
+serde.workspace = true
+stwo.workspace = true
+stwo-cairo-protocol.workspace = true

@@ -1,0 +1,21 @@
+[package]
+name = "stwo-cairo-container"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+freenet-stdlib = { workspace = true, features = ["contract"] }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+stwo-cairo-protocol.workspace = true
+stwo-cairo-verifier.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+contract = ["freenet-stdlib/contract"]
+default = ["freenet-main-contract", "contract"]
+freenet-main-contract = []
+trace = ["freenet-stdlib/trace"]

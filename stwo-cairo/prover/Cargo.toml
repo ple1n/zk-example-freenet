@@ -1,0 +1,24 @@
+[package]
+name = "stwo-cairo-cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+cairo-lang-executable.workspace = true
+cairo-lang-execute-utils.workspace = true
+cairo-lang-runner.workspace = true
+cairo-air.workspace = true
+cairo-program-runner-lib.workspace = true
+cairo-vm.workspace = true
+clap.workspace = true
+hex.workspace = true
+num-bigint.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+stwo-cairo-adapter.workspace = true
+stwo-cairo-prover.workspace = true
+stwo-cairo-protocol.workspace = true
+stwo-cairo-verifier.workspace = true
+stwo.workspace = true
+zk-notepad-shared.workspace = true

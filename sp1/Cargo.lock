@@ -5837,10 +5837,7 @@ dependencies = [
 name = "sp1-notepad-guest"
 version = "0.1.0"
 dependencies = [
- "serde",
- "sp1-merkle-shared",
  "sp1-zkvm",
- "zk-notepad-shared",
 ]
 
 [[package]]

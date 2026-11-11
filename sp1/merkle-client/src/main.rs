@@ -49,7 +49,7 @@ enum Command {
         leaf_index: u32,
         #[arg(long, default_value = "sp1-merkle-candidate.json")]
         output: PathBuf,
-        #[arg(long, help = "Run the guest once to report its SP1 cycle count")]
+        #[arg(long, help = "Count guest cycles and exit without proving")]
         count_cycles: bool,
     },
     Verify {
@@ -216,6 +216,19 @@ async fn prove(
     if root != parameters.root {
         bail!("tree secret does not match the public root in contract parameters");
     }
+    let mut stdin = SP1Stdin::new();
+    stdin.write(&parameters.tree_depth);
+    stdin.write(&leaf_index);
+    stdin.write(&leaf);
+    stdin.write(&siblings);
+    stdin.write(&parameters.root);
+
+    if count_cycles {
+        let cycles = count_guest_cycles(&GUEST_ELF, &stdin).await?;
+        println!("SP1 guest cycle count: {cycles}");
+        return Ok(());
+    }
+
     let expected_key_hash = verifying_key_hash(&parameters)?;
     let key_started = Instant::now();
     let proving_key = read_proving_key(&proving_key_path, &GUEST_ELF)?;
@@ -230,18 +243,8 @@ async fn prove(
             proving_key_path.display()
         );
     }
-
-    let mut stdin = SP1Stdin::new();
-    stdin.write(&parameters.tree_depth);
-    stdin.write(&leaf_index);
-    stdin.write(&leaf);
-    stdin.write(&siblings);
-    stdin.write(&parameters.root);
     let client = ProverClient::builder().cpu().build().await;
-    if count_cycles {
-        let cycles = count_guest_cycles(&GUEST_ELF, &stdin).await?;
-        println!("SP1 guest cycle count: {cycles}");
-    }
+
     let prove_started = Instant::now();
     let proof = monitor_async("SP1 compressed proof generation", async {
         client

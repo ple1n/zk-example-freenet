@@ -6161,6 +6161,7 @@ dependencies = [
 name = "zk-notepad-shared"
 version = "0.1.0"
 dependencies = [
+ "indicatif",
  "serde",
  "sysinfo",
 ]

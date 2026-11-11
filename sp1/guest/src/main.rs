@@ -1,22 +1,35 @@
 #![no_main]
 #![no_std]
 
-use sp1_merkle_shared::poseidon2_bytes;
-use zk_notepad_shared::ProofValues;
-
 sp1_zkvm::entrypoint!(main);
 
 pub fn main() {
-    let secret: [u8; 32] = sp1_zkvm::io::read();
-    let public_y: [u8; 32] = sp1_zkvm::io::read();
-    let counter: u64 = sp1_zkvm::io::read();
-    let text_hash: [u8; 32] = sp1_zkvm::io::read();
+    let input = sp1_zkvm::io::read_vec();
+    assert_eq!(input.len(), 104);
 
-    assert_eq!(poseidon2_bytes(&secret), public_y);
+    let mut secret = [0u8; 32];
+    secret.copy_from_slice(&input[..32]);
+    let mut public_y = [0u8; 32];
+    public_y.copy_from_slice(&input[32..64]);
+    let counter = u64::from_le_bytes(input[64..72].try_into().unwrap());
+    let mut text_hash = [0u8; 32];
+    text_hash.copy_from_slice(&input[72..]);
 
-    sp1_zkvm::io::commit(&ProofValues {
-        public_y,
-        counter,
-        text_hash,
+    let digest = sp1_zkvm::syscalls::Poseidon2ByteHash::hash(&secret);
+    let public_y_words: [u32; 8] = core::array::from_fn(|i| {
+        let offset = i * 4;
+        u32::from_le_bytes([
+            public_y[offset],
+            public_y[offset + 1],
+            public_y[offset + 2],
+            public_y[offset + 3],
+        ])
     });
+    assert_eq!(digest, public_y_words);
+
+    let mut public_values = [0u8; 72];
+    public_values[..32].copy_from_slice(&public_y);
+    public_values[32..40].copy_from_slice(&counter.to_le_bytes());
+    public_values[40..].copy_from_slice(&text_hash);
+    sp1_zkvm::io::commit_slice(&public_values);
 }

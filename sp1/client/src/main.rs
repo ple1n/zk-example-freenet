@@ -46,7 +46,7 @@ enum Command {
         text: String,
         #[arg(long, default_value = "sp1-candidate.json")]
         output: PathBuf,
-        #[arg(long, help = "Run the guest once to report its SP1 cycle count")]
+        #[arg(long, help = "Count guest cycles and exit without proving")]
         count_cycles: bool,
     },
     Verify {
@@ -205,10 +205,18 @@ async fn prove(
     }
     let text_hash = poseidon2_bytes(text.as_bytes());
     let mut stdin = SP1Stdin::new();
-    stdin.write(&secret);
-    stdin.write(&public_y);
-    stdin.write(&counter);
-    stdin.write(&text_hash);
+    let mut guest_input = [0u8; 104];
+    guest_input[..32].copy_from_slice(&secret);
+    guest_input[32..64].copy_from_slice(&public_y);
+    guest_input[64..72].copy_from_slice(&counter.to_le_bytes());
+    guest_input[72..].copy_from_slice(&text_hash);
+    stdin.write_slice(&guest_input);
+
+    if count_cycles {
+        let cycles = count_guest_cycles(&GUEST_ELF, &stdin).await?;
+        println!("SP1 guest cycle count: {cycles}");
+        return Ok(());
+    }
 
     let key_started = Instant::now();
     let proving_key = read_proving_key(&proving_key_path, &GUEST_ELF)?;
@@ -224,10 +232,6 @@ async fn prove(
         );
     }
     let client = ProverClient::builder().cpu().build().await;
-    if count_cycles {
-        let cycles = count_guest_cycles(&GUEST_ELF, &stdin).await?;
-        println!("SP1 guest cycle count: {cycles}");
-    }
     let prove_started = Instant::now();
     let proof = monitor_async("SP1 compressed proof generation", async {
         client

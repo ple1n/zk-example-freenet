@@ -50,9 +50,9 @@ The notepad uses SP1's `Poseidon2ByteHash` syscall for its secret and text hashe
 Host-side clients and the contract use the matching SP1 Poseidon2 sponge encoding.
 Its proving key and parameters are tied to the notepad guest ELF. The commands
 above use files in `sp1/`; client path defaults are relative to the current
-working directory. Pass `--count-cycles` to `prove` to run the guest once
-before proving and report its SP1 cycle count; this optional diagnostic adds a
-second guest execution.
+working directory. Pass `--count-cycles` to `prove` to run the guest once and
+report its SP1 cycle count. This diagnostic exits without generating a proof
+and does not require a proving key.
 
 ## Poseidon2 Merkle membership
 
@@ -97,8 +97,8 @@ verification needs neither the tree secret nor the proving key. The commands
 report setup, proving, compressed proof size, and local verification timing.
 The commands above use files in `sp1/`, separate from the notepad's files.
 Client path defaults are relative to the current working directory. Pass
-`--count-cycles` to `prove` to opt into an additional guest execution that
-reports the SP1 cycle count.
+`--count-cycles` to `prove` to run the guest once, report its SP1 cycle count,
+and exit without generating a proof or loading a proving key.
 
 ## Separate Freenet contract sizes
 
@@ -230,5 +230,5 @@ client's offline verification path. Setup, proof generation, and verification
 display a live process CPU/RSS and elapsed-time
 ticker, followed by peak RSS for that stage. CPU use is process-wide and can
 exceed 100% when multiple cores are busy. SP1's compressed proof result does
-not expose guest cycle counts directly; `--count-cycles` opts into a separate
-guest execution to collect that statistic.
+not expose guest cycle counts directly; `--count-cycles` runs the guest
+separately to collect that statistic, then exits without proving.

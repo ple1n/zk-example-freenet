@@ -570,3 +570,17 @@ Proof verification took 0.044s
 Candidate proof is valid.
 Verify command took 0.057s
 ```
+
+# Sp1-notepad run, with fixed hash path
+
+```sh
+== SP1 proving-key setup started ==                                                                                          
+SP1 proving-key setup
+== SP1 proving-key setup finished in 45.6s | CPU 629.9% (peak 892.1%) | memory 6632 MiB (peak 7183 MiB) ==Proving-key setup and cache write took 45.673s
+Wrote public contract parameters to /e/proj/zk-example-freenet/sp1/contract-parameters.json
+Wrote reusable proving key to /e/proj/zk-example-freenet/sp1/proving-key.bin
+Public y: 66494739c6a16801f9416b0c571a2e3cafb29d52076fcd7524177a046b625b72
+Setup command took 45.674s
+
+
+```

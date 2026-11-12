@@ -34,12 +34,12 @@ contract parameters.
 ## Experiment layout and runner
 
 The experiment workspaces are siblings: [`ziren/`](./ziren/), [`sp1/`](./sp1/),
-[`snarkvm/`](./snarkvm/), [`sp1-keccak/`](./sp1-keccak/), and
-[`snarkvm-keccak-poseidon/`](./snarkvm-keccak-poseidon/). Each keeps its own
-Cargo workspace or package and lockfile so toolchains and dependency graphs
-remain independent. The root [`shared/`](./shared/) crate contains code reused
-by Ziren and SP1, plus an in-process resource measurement library used by the
-native clients.
+[`snarkvm/`](./snarkvm/), [`sp1-keccak/`](./sp1-keccak/),
+[`snarkvm-keccak-poseidon/`](./snarkvm-keccak-poseidon/), and
+[`stwo-cairo/`](./stwo-cairo/). Each keeps its own Cargo workspace or package
+and lockfile so toolchains and dependency graphs remain independent. The root
+[`shared/`](./shared/) crate contains code reused by Ziren and SP1, plus an
+in-process resource measurement library used by the native clients.
 
 Each experiment has its own `setup.sh` and `run_all.sh`. Experiments with
 environment configuration keep that in a separate `env.sh` (or `env.fish`).
@@ -206,6 +206,24 @@ The workspace shares host setup, proving-key loading, compressed-proof
 verification, and Freenet submission between its notepad and Poseidon2 Merkle
 membership experiments. See [sp1/README.md](./sp1/README.md) for proof
 generation, offline verification, and separate contract-size measurements.
+
+## Stwo Cairo performance
+
+The [`stwo-cairo/`](./stwo-cairo/) experiment runs Cairo 1 programs through
+Stwo's Cairo 1.3 bootloader. A single local release-mode run of
+`bash stwo-cairo/run_all.sh --dev` produced and verified both proofs:
+
+| Workload | Cairo VM | Stwo adaptation | Proof generation | Verification | Peak proving RSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Poseidon hash | 2 ms | 45 ms | 20.6 s | 39 ms | 14,515 MiB |
+| Depth-2 Poseidon Merkle | 4 ms | 45 ms | 20.9 s | 21 ms | 14,632 MiB |
+
+These are smoke-test measurements using the development parameters (10 bits of
+conjectured soundness), not production proving results. Host hardware details
+were not recorded, so these numbers should not be compared directly with the
+historical Ziren and SP1 runs below. The default Stwo profile was not measured.
+See [`stwo-cairo/README.md`](./stwo-cairo/README.md) for setup and proof
+commands.
 
 ## Historical test runs
 

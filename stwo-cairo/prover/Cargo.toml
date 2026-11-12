@@ -6,8 +6,14 @@ edition = "2024"
 [dependencies]
 anyhow.workspace = true
 cairo-lang-executable.workspace = true
+cairo-lang-executable-plugin.workspace = true
 cairo-lang-execute-utils.workspace = true
+cairo-lang-compiler.workspace = true
+cairo-lang-defs.workspace = true
+cairo-lang-filesystem.workspace = true
+cairo-lang-lowering.workspace = true
 cairo-lang-runner.workspace = true
+cairo-lang-semantic.workspace = true
 cairo-air.workspace = true
 cairo-program-runner-lib.workspace = true
 cairo-vm.workspace = true

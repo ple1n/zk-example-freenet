@@ -8,23 +8,28 @@ the resulting candidates in a Freenet contract:
   The leaf, siblings, and left/right path bits are private; the public output is
   the two-limb encoding of the root.
 
-Stwo Cairo 1.3's runner consumes Cairo VM JSON programs. The pinned Cairo 0
-compiler therefore compiles these proof programs; the initial Scarb/Cairo 1
-package is not compatible with this runner. `felt` values are the Cairo native
-field, not a byte-string or foreign-field encoding. Input values are decimal
-strings in JSON to avoid host-side integer precision loss.
+The source programs use standard Cairo 1 syntax. The host CLI copies each source
+into a temporary compiler project and uses Cairo's executable plugin to generate
+the input/output ABI Stwo expects. The plugin attribute is added only to that
+temporary copy; the editor-visible sources remain standard Cairo. Stwo's Cairo
+1.3 bootloader task path runs the artifact and adapts the resulting Cairo VM
+trace.
+`felt252` values are the Cairo native field, not a byte-string or foreign-field
+encoding. Inputs are ordered arrays of decimal strings in JSON to avoid
+host-side integer precision loss.
 
 ## Setup and local proof workflow
 
-From the repository root:
+Scarb manages the Cairo core library. From the repository root, run:
 
 ```sh
-bash stwo-cairo/setup.sh
 bash stwo-cairo/run_all.sh
 ```
 
-`setup.sh` creates an isolated Python environment, compiles both programs, and
-installs the WASM target for the pinned Rust toolchain. By default,
+`setup.sh` resolves the core library source directory from Scarb metadata;
+`CAIRO_CORELIB_PATH` can be set to override it. It requires Scarb and `jq`,
+compiles both programs into Cairo 1 executable artifacts, and installs the WASM
+target for the pinned Rust toolchain. By default,
 `run_all.sh` runs both experiments sequentially with the default 96-bit proof
 parameters and writes proofs, candidates, and contract parameters under
 `stwo-cairo/artifacts/`.

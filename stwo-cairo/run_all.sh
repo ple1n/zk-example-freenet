@@ -25,8 +25,8 @@ esac
 
 bash "$DIR/setup.sh"
 mkdir -p "$DIR/artifacts"
-printf '{"secret":"12345"}\n' > "$DIR/artifacts/hash-input.json"
-printf '{"leaf":"123","sibling_0":"456","sibling_1":"789","bit_0":"0","bit_1":"1"}\n' \
+printf '["12345"]\n' > "$DIR/artifacts/hash-input.json"
+printf '["123","456","789","0","1"]\n' \
     > "$DIR/artifacts/merkle-input.json"
 
 run_experiment() {

@@ -1,34 +1,43 @@
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{
+    fs,
+    path::PathBuf,
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use anyhow::Context;
 use cairo_air::utils::ProofFormat;
-use cairo_program_runner_lib::{ProgramInput, cairo_run_program, utils::get_program};
+use cairo_lang_compiler::{
+    db::RootDatabase, diagnostics::DiagnosticsReporter, project::setup_project,
+};
+use cairo_lang_executable::{
+    compile::{ExecutableConfig, compile_executable_in_prepared_db},
+    executable::{EntryPointKind, Executable},
+};
+use cairo_lang_executable_plugin::executable_plugin_suite;
+use cairo_lang_execute_utils::program_and_hints_from_executable;
+use cairo_lang_filesystem::{
+    cfg::{Cfg, CfgSet},
+    db::init_dev_corelib,
+    ids::CrateInput,
+};
+use cairo_program_runner_lib::{
+    PRIVACY_SIMPLE_BOOTLOADER_COMPILED_JSON, ProgramInput, SimpleBootloaderInput, Task, TaskSpec,
+    cairo_run_program,
+    hints::types::{Cairo1Executable, HashFunc, PrivacySimpleBootloaderInput},
+};
 use cairo_vm::{
     Felt252,
     cairo_run::CairoRunConfig,
-    hint_processor::builtin_hint_processor::{
-        builtin_hint_processor_definition::HintProcessorData, hint_utils::get_integer_from_var_name,
-    },
-    hint_processor::hint_processor_definition::HintProcessorLogic,
-    types::{exec_scope::ExecutionScopes, layout_name::LayoutName},
-    vm::{
-        errors::hint_errors::HintError,
-        runners::cairo_runner::{ResourceTracker, RunResources},
-        vm_core::VirtualMachine,
-    },
+    types::{layout_name::LayoutName, program::Program},
 };
 use clap::{Parser, Subcommand};
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use stwo_cairo_adapter::adapter::adapt;
 use stwo_cairo_protocol::{Candidate, ContractParameters};
 use stwo_cairo_prover::prover::create_and_serialize_proof;
 use stwo_cairo_verifier::{inspect_candidate, verify_candidate};
 use zk_notepad_shared::process::measure;
-
-const INPUT_HINT_PREFIX: &str = "memory[ap] = program_input['";
-const LOW_OUTPUT_HINT: &str = "memory[ap] = (ids.result % 2**128)";
-const HIGH_OUTPUT_HINT: &str = "memory[ap] = (ids.result // 2**128)";
 
 #[derive(Parser)]
 #[command(about = "Run, prove, and verify native-field Cairo experiments with Stwo")]
@@ -39,6 +48,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    CompileCairo1 {
+        #[arg(long)]
+        source: PathBuf,
+        #[arg(long)]
+        corelib: PathBuf,
+        #[arg(long)]
+        program: String,
+        #[arg(long)]
+        output: PathBuf,
+    },
     Run {
         #[arg(long)]
         program: PathBuf,
@@ -73,125 +92,146 @@ enum Command {
     },
 }
 
-struct ProgramInputHintProcessor {
-    resources: RunResources,
-    input: Option<HashMap<String, String>>,
-}
+fn compile_cairo1(
+    source_path: PathBuf,
+    corelib_path: PathBuf,
+    program_name: String,
+    output_path: PathBuf,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        matches!(program_name.as_str(), "poseidon_hash" | "poseidon_merkle"),
+        "unsupported Cairo program name: {program_name}"
+    );
+    let source_path = source_path
+        .canonicalize()
+        .with_context(|| format!("resolving Cairo source {}", source_path.display()))?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("reading system clock")?
+        .as_nanos();
+    let build_dir = std::env::temp_dir().join(format!(
+        "stwo-cairo-{}-{}-{nonce}",
+        std::process::id(),
+        program_name
+    ));
+    fs::create_dir(&build_dir)
+        .with_context(|| format!("creating temporary Cairo project {}", build_dir.display()))?;
+    let compile_result = (|| {
+        let source_dir = build_dir.join("src");
+        fs::create_dir(&source_dir)?;
+        let source = fs::read_to_string(&source_path)
+            .with_context(|| format!("reading Cairo source {}", source_path.display()))?;
+        let function_declaration = format!("pub fn {program_name}(");
+        anyhow::ensure!(
+            source.matches(&function_declaration).count() == 1,
+            "expected one public `{program_name}` function in {}",
+            source_path.display()
+        );
+        let source = source.replacen(
+            &function_declaration,
+            &format!("#[executable]\n{function_declaration}"),
+            1,
+        );
+        fs::write(source_dir.join("lib.cairo"), source)
+            .with_context(|| format!("copying Cairo source {}", source_path.display()))?;
+        fs::write(
+            build_dir.join("cairo_project.toml"),
+            "[crate_roots]\nstwo_cairo_compile = \"src\"\n\n[config.global]\nedition = \"2024_07\"\n",
+        )
+        .with_context(|| format!("writing temporary Cairo project config in {}", build_dir.display()))?;
 
-impl ProgramInputHintProcessor {
-    fn new() -> Self {
-        Self {
-            resources: RunResources::default(),
-            input: None,
-        }
-    }
+        let corelib_path = corelib_path
+            .canonicalize()
+            .with_context(|| format!("resolving Cairo corelib path {}", corelib_path.display()))?;
+        anyhow::ensure!(
+            corelib_path.join("lib.cairo").is_file(),
+            "Cairo corelib path must point to its src directory: {}",
+            corelib_path.display()
+        );
+        let mut db = RootDatabase::builder()
+            .skip_auto_withdraw_gas()
+            .with_cfg(CfgSet::from_iter([Cfg::kv("gas", "disabled")]))
+            .with_default_plugin_suite(executable_plugin_suite())
+            .build()
+            .context("creating Cairo compiler database")?;
+        init_dev_corelib(&mut db, corelib_path);
 
-    fn read_input(exec_scopes: &ExecutionScopes) -> Result<HashMap<String, String>, HintError> {
-        let input = exec_scopes
-            .get_ref::<ProgramInput>("program_input")
-            .map_err(|_| HintError::CustomHint("program_input is unavailable".into()))?;
-        let bytes = match input {
-            ProgramInput::Path(path) => fs::read(path)
-                .map_err(|error| HintError::CustomHint(format!("reading input: {error}").into()))?,
-            ProgramInput::Json(json) => json.as_bytes().to_vec(),
-            ProgramInput::Value(_) => {
-                return Err(HintError::CustomHint(
-                    "in-memory program input is unsupported".into(),
-                ));
-            }
-        };
-        serde_json::from_slice(&bytes)
-            .map_err(|error| HintError::CustomHint(format!("parsing input: {error}").into()))
-    }
+        let crate_inputs =
+            setup_project(&mut db, &build_dir).context("loading temporary Cairo project")?;
+        let crate_ids = CrateInput::into_crate_ids(&db, crate_inputs.clone());
+        anyhow::ensure!(!crate_ids.is_empty(), "Cairo project has no crate root");
+        let compiled = compile_executable_in_prepared_db(
+            &db,
+            None,
+            crate_ids,
+            DiagnosticsReporter::stderr().with_crates(&crate_inputs),
+            ExecutableConfig::default(),
+        )
+        .with_context(|| format!("compiling Cairo 1 executable {program_name}"))?;
+        Ok::<_, anyhow::Error>(Executable::new(compiled.compiled_function))
+    })();
+    let cleanup_result = fs::remove_dir_all(&build_dir)
+        .with_context(|| format!("removing temporary Cairo project {}", build_dir.display()));
+    let executable = compile_result?;
+    cleanup_result?;
 
-    fn insert_value(vm: &mut VirtualMachine, value: &str) -> Result<(), HintError> {
-        let felt = Felt252::from_dec_str(value)
-            .map_err(|error| HintError::CustomHint(format!("invalid felt252: {error}").into()))?;
-        vm.insert_value(vm.get_ap(), felt)
-            .map_err(|error| HintError::CustomHint(format!("writing input felt: {error}").into()))
-    }
-
-    fn insert_result_limb(
-        vm: &mut VirtualMachine,
-        data: &HintProcessorData,
-        shift: usize,
-    ) -> Result<(), HintError> {
-        let value = get_integer_from_var_name("result", vm, &data.ids_data, &data.ap_tracking)?;
-        let encoded = BigUint::from_bytes_be(&value.to_bytes_be());
-        let limb = if shift == 0 {
-            encoded & ((BigUint::from(1u8) << 128) - 1u8)
-        } else {
-            encoded >> shift
-        };
-        let felt = Felt252::from_dec_str(&limb.to_string()).map_err(|error| {
-            HintError::CustomHint(format!("invalid output limb: {error}").into())
-        })?;
-        vm.insert_value(vm.get_ap(), felt)
-            .map_err(|error| HintError::CustomHint(format!("writing output limb: {error}").into()))
-    }
-}
-
-impl HintProcessorLogic for ProgramInputHintProcessor {
-    fn execute_hint(
-        &mut self,
-        vm: &mut VirtualMachine,
-        exec_scopes: &mut ExecutionScopes,
-        hint_data: &Box<dyn std::any::Any>,
-    ) -> Result<(), HintError> {
-        let data = hint_data
-            .downcast_ref::<HintProcessorData>()
-            .ok_or(HintError::WrongHintData)?;
-        match data.code.as_str() {
-            LOW_OUTPUT_HINT => Self::insert_result_limb(vm, data, 0),
-            HIGH_OUTPUT_HINT => Self::insert_result_limb(vm, data, 128),
-            code => {
-                let Some(key) = code
-                    .strip_prefix(INPUT_HINT_PREFIX)
-                    .and_then(|code| code.strip_suffix("']"))
-                else {
-                    return Err(HintError::UnknownHint(code.to_owned().into_boxed_str()));
-                };
-                if self.input.is_none() {
-                    self.input = Some(Self::read_input(exec_scopes)?);
-                }
-                let value = self
-                    .input
-                    .as_ref()
-                    .and_then(|input| input.get(key))
-                    .ok_or_else(|| {
-                        HintError::CustomHint(format!("input field '{key}' is missing").into())
-                    })?;
-                Self::insert_value(vm, value)
-            }
-        }
-    }
-}
-
-impl ResourceTracker for ProgramInputHintProcessor {
-    fn consumed(&self) -> bool {
-        self.resources.consumed()
-    }
-
-    fn consume_step(&mut self) {
-        self.resources.consume_step();
-    }
-
-    fn get_n_steps(&self) -> Option<usize> {
-        self.resources.get_n_steps()
-    }
-
-    fn run_resources(&self) -> &RunResources {
-        &self.resources
-    }
+    write_json(&output_path, &executable)?;
+    println!("Wrote Cairo 1 executable to {}", output_path.display());
+    Ok(())
 }
 
 fn run(
     program_path: PathBuf,
     input_path: PathBuf,
 ) -> anyhow::Result<stwo_cairo_adapter::ProverInput> {
-    let program = get_program(&program_path)
-        .with_context(|| format!("loading Cairo program {}", program_path.display()))?;
-    let program_input = ProgramInput::Path(input_path);
+    let executable: Executable = read_json(&program_path)?;
+    let entrypoint = executable
+        .entrypoints
+        .iter()
+        .find(|entrypoint| matches!(entrypoint.kind, EntryPointKind::Bootloader))
+        .context("Cairo 1 executable has no bootloader entrypoint")?;
+    let (program, string_to_hint) = program_and_hints_from_executable(&executable, entrypoint)
+        .context("loading Cairo 1 executable for Cairo VM")?;
+    let input: Vec<String> = read_json(&input_path)?;
+    let mut input_values = Vec::with_capacity(input.len());
+    for (index, value) in input.iter().enumerate() {
+        Felt252::from_dec_str(value)
+            .with_context(|| format!("input argument {index} is not a valid felt252"))?;
+        input_values.push(
+            value
+                .parse()
+                .with_context(|| format!("input argument {index} is not a decimal integer"))?,
+        );
+    }
+    let user_args = cairo_lang_execute_utils::user_args_from_flags(None, &input_values)
+        .context("converting input values to Cairo 1 arguments")?;
+    let task = Task::Cairo1Program(Cairo1Executable {
+        program,
+        user_args,
+        string_to_hint,
+    });
+    let task_spec = TaskSpec {
+        task: Rc::new(task),
+        program_hash_function: HashFunc::Poseidon,
+    };
+    let bootloader = Program::from_bytes(PRIVACY_SIMPLE_BOOTLOADER_COMPILED_JSON, Some("main"))
+        .context("loading Stwo privacy simple bootloader")?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("reading system clock")?
+        .as_nanos();
+    let output_preimage_dump_path = std::env::temp_dir().join(format!(
+        "stwo-cairo-preimage-{}-{nonce}.json",
+        std::process::id()
+    ));
+    let bootloader_input = PrivacySimpleBootloaderInput {
+        simple_bootloader_input: SimpleBootloaderInput {
+            fact_topologies_path: None,
+            single_page: true,
+            tasks: vec![task_spec],
+        },
+        output_preimage_dump_path: output_preimage_dump_path.clone(),
+    };
     let config = CairoRunConfig {
         entrypoint: "main",
         trace_enabled: true,
@@ -205,11 +245,23 @@ fn run(
         allow_missing_builtins: None,
         dynamic_layout_params: None,
     };
-    let mut hints = ProgramInputHintProcessor::new();
-    let runner = measure("Cairo VM execution", || {
-        cairo_run_program(&program, Some(program_input), config, Some(&mut hints))
-            .context("executing Cairo program in proof mode")
-    })?;
+    let run_result = measure("Cairo VM execution", || {
+        cairo_run_program(
+            &bootloader,
+            Some(ProgramInput::Value(Box::new(bootloader_input))),
+            config,
+            None,
+        )
+        .context("executing Cairo 1 task in proof mode")
+    });
+    let cleanup_result = if output_preimage_dump_path.try_exists()? {
+        fs::remove_file(&output_preimage_dump_path)
+            .with_context(|| format!("removing {}", output_preimage_dump_path.display()))
+    } else {
+        Ok(())
+    };
+    let runner = run_result?;
+    cleanup_result?;
     measure("Stwo input adaptation", || {
         adapt(&runner).context("adapting Cairo execution for Stwo")
     })
@@ -290,6 +342,12 @@ fn run_to_file(program: PathBuf, input: PathBuf, prover_input: PathBuf) -> anyho
 
 fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
+        Command::CompileCairo1 {
+            source,
+            corelib,
+            program,
+            output,
+        } => compile_cairo1(source, corelib, program, output)?,
         Command::Run {
             program,
             input,
